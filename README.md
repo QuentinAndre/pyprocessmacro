@@ -7,7 +7,7 @@ The Process Macro for SAS and SPSS, and its associated files, are copyrighted by
 must not be edited or modified, and must not be distributed outside of [www.processmacro.org](www.processmacro.org).
  
 Because PyProcessMacro is a complete reimplementation of the Process Macro, and was not based on the original 
-code, permission was generously granted by Andrew F. Hayes to distribute PyProcessMacro under a BSD license.
+code, permission was generously granted by Andrew F. Hayes to distribute PyProcessMacro under a MIT license.
  
  This permission is not an endorsement of PyProcessMacro: all potential errors, bugs and inaccuracies are my own, and
 Andrew F. Hayes was not involved in writing, reviewing, or debugging the code.
@@ -20,7 +20,7 @@ that students and researchers had to purchase a license of those softwares to ma
 
 Because of the growing popularity of Python in the scientific community, I decided to implement the features of the 
 Process Macro into an open-source library, that researchers will be able to use without relying on those proprietary
-softwaress. PyProcessMacro is released under a BSD license.
+softwaress. PyProcessMacro is released under a MIT license.
  
 # 3. Features
 
