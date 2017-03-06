@@ -24,7 +24,7 @@ setup(
     include_package_data=False,
 
     keywords=['mediation-analysis', 'statistics', 'process', 'plotting', 'data-science', 'data-analysis',
-              'data-visuallization', 'regression-models'],
+              'data-visualization', 'regression-models'],
 
     url='https://github.com/QuentinAndre/pyprocessmacro/',
 
