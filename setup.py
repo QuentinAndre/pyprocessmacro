@@ -23,12 +23,16 @@ setup(
 
     include_package_data=False,
 
+    keywords=['mediation-analysis', 'statistics', 'process', 'plotting', 'data-science', 'data-analysis',
+              'data-visuallization', 'regression-models'],
+
     url='https://github.com/QuentinAndre/pyprocessmacro/',
 
     classifiers=[
         "Programming Language :: Python",
         "License :: OSI Approved",
         "Natural Language :: English",
+        "Development Status :: 4 - Beta",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.5",
         "Topic :: Statistics",
