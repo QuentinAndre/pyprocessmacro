@@ -1,4 +1,4 @@
-PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro for SAS and SPSS
+PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 ========================================================
 
 # 1. Copyright Notice for the original Process Macro
