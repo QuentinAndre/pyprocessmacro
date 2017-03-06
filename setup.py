@@ -34,8 +34,7 @@ setup(
         "Natural Language :: English",
         "Development Status :: 4 - Beta",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.5",
-        "Topic :: Statistics",
+        "Programming Language :: Python :: 3.5"
     ],
 
     license="MIT"
