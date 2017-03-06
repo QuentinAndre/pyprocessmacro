@@ -102,9 +102,6 @@ The equation(s) to which the controls are added is specified through the `contro
 The ability to specify a different list of control for each equation is coming in the next release of PyProcessMacro.
   
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"],
             controls=["Control1", "Control2"],
@@ -120,9 +117,6 @@ PyProcessMacro prefers a more explicit approach, and requires you to set the par
 should be estimated using a Logistic regression.
 
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], logit=True)
 p.summary()
@@ -145,9 +139,6 @@ In PyProcessMacro, the user must instead supply custom values for each moderator
 passed to the `modval` parameter:
 
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"],
             modval={
@@ -165,9 +156,6 @@ When the Process object is initialized by Python, it displays various informatio
  argument `suppr_init=True` when initializing the model.
  
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 p.summary()
@@ -202,9 +190,6 @@ Each OutcomeModel object has the following methods:
  model.
  
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
@@ -229,9 +214,6 @@ gives you access to the following methods:
 interval for each of the (conditional) direct effect(s).
 
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
@@ -260,9 +242,6 @@ SE/CI, for each of the moderators and mediation paths. If the model does not com
 SE/CI, for each of the mediation paths. If the model does not compute a MMM, this will return an error.
 
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
@@ -282,9 +261,6 @@ In PyProcessMacro, this is done by calling the method `get_bootstrap_estimates()
 the parameters estimates for all variables in the model, for each outcome.
 
 ````python
-from pyprocessmacro import Process
-import pandas as pd
-df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
