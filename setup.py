@@ -17,11 +17,9 @@ setup(
 
     description="A Python library for moderation, mediation and conditional process analysis. Based on Andrew F. Hayes Process Macro.",
 
-    long_description=open('README.md').read(),
+    long_description=open('README.md', encoding="utf-8").read(),
 
     install_requires=["numpy", "matplotlib", "pandas", "scipy", "seaborn"],
-
-    include_package_data=False,
 
     keywords=['mediation-analysis', 'statistics', 'process', 'plotting', 'data-science', 'data-analysis',
               'data-visualization', 'regression-models'],
