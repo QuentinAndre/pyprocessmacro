@@ -854,7 +854,7 @@ class Process(object):
             initstr += ("\n\nBootstrapping information for indirect effects:\n"
                         "Final number of bootstrap samples: {}\n"
                         "Number of samples discarded due to convergence issues: {}"
-                        .format(self.options["boot"], self.indirect_model.n_fail_samples))
+                        .format(self.options["boot"], self.indirect_model._n_fail_samples))
 
         print(initstr)
 
