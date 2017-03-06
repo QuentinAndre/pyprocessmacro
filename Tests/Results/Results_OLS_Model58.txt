@@ -1,0 +1,110 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 58
+    Y = y
+    X = x
+   M1 = m1
+   M2 = m2
+    W = w
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: m1
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9487      .9001      .9973  3070.4477     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0855      .0593    18.2944      .0000      .9691     1.2020
+x             .9592      .0421    22.7899      .0000      .8766     1.0418
+w             .9677      .0448    21.6190      .0000      .8798     1.0555
+int_1        1.0050      .0311    32.3625      .0000      .9441     1.0660
+
+Product terms key:
+
+ int_1    x           X     w
+
+**************************************************************************
+Outcome: m2
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9489      .9005     1.0112  2797.1441     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9465      .0583    16.2349      .0000      .8321     1.0609
+x            -.9838      .0403   -24.3880      .0000    -1.0629     -.9046
+w           -1.0259      .0421   -24.3571      .0000    -1.1085     -.9432
+int_1        -.9878      .0307   -32.1447      .0000    -1.0481     -.9275
+
+Product terms key:
+
+ int_1    x           X     w
+
+**************************************************************************
+Outcome: y
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9752      .9509     1.0306  3125.6655     6.0000   993.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0369      .0902    11.4911      .0000      .8598     1.2140
+m1            .9858      .0392    25.1169      .0000      .9088     1.0628
+m2            .9819      .0355    27.6291      .0000      .9121     1.0516
+x            1.0254      .0729    14.0699      .0000      .8824     1.1685
+w             .9499      .0759    12.5140      .0000      .8010     1.0989
+int_2        1.0035      .0235    42.6946      .0000      .9574     1.0496
+int_3         .9948      .0229    43.3710      .0000      .9498     1.0398
+
+Product terms key:
+
+ int_2    m1          X     w
+ int_3    m2          X     w
+
+******************** DIRECT AND INDIRECT EFFECTS *************************
+
+Direct effect of X on Y
+     Effect         SE          t          p       LLCI       ULCI
+     1.0254      .0729    14.0699      .0000      .8824     1.1685
+
+Conditional indirect effect(s) of X on Y at values of the moderator(s):
+
+Mediator
+            w     Effect    Boot SE   BootLLCI   BootULCI
+m1      .0124      .9701      .0547      .8632     1.0768
+m1     1.0131     3.9595      .0848     3.7931     4.1248
+m1     2.0137     8.9686      .1800     8.6210     9.3215
+
+Mediator
+            w     Effect    Boot SE   BootLLCI   BootULCI
+m2      .0124     -.9903      .0551    -1.1034     -.8844
+m2     1.0131    -3.9484      .0809    -4.1080    -3.7923
+m2     2.0137    -8.8741      .1660    -9.2091    -8.5535
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Number of bootstrap samples for bias corrected bootstrap confidence intervals:
+     5000
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

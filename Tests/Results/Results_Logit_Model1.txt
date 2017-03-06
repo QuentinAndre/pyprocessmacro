@@ -1,0 +1,58 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 1
+    Y = y2
+    X = x
+    M = m
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: y2
+
+Coding of binary DV for analysis:
+        y2  Analysis
+       .00       .00
+      1.00      1.00
+
+Logistic Regression Summary
+       -2LL   Model LL    p-value   McFadden   CoxSnell   Nagelkrk          n
+  1295.4706    90.6278      .0000      .0654      .0866      .1155  1000.0000
+
+Model
+              coeff         se          Z          p       LLCI       ULCI
+constant      .3562      .0901     3.9537      .0001      .1796      .5328
+m            -.3214      .0920    -3.4930      .0005     -.5017     -.1411
+x            -.3534      .0658    -5.3728      .0000     -.4823     -.2244
+int_1        -.1949      .0680    -2.8647      .0042     -.3283     -.0616
+
+Product terms key:
+
+ int_1    x           X     m
+
+*************************************************************************
+
+Conditional effect of X on Y at values of the moderator(s):
+          m     Effect         se          Z          p       LLCI       ULCI
+     -.9795     -.1625      .0925    -1.7555      .0792     -.3438      .0189
+      .0188     -.3570      .0658    -5.4251      .0000     -.4860     -.2280
+     1.0171     -.5516      .0966    -5.7121      .0000     -.7408     -.3623
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

@@ -1,0 +1,78 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 3
+    Y = y2
+    X = x
+    M = m
+    W = w
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: y2
+
+Coding of binary DV for analysis:
+        y2  Analysis
+       .00       .00
+      1.00      1.00
+
+Logistic Regression Summary
+       -2LL   Model LL    p-value   McFadden   CoxSnell   Nagelkrk          n
+  1241.9974   136.5429      .0000      .0990      .1276      .1706  1000.0000
+
+Model
+              coeff         se          Z          p       LLCI       ULCI
+constant      .7637      .1337     5.7116      .0000      .5016     1.0258
+m            -.3537      .1358    -2.6045      .0092     -.6199     -.0875
+x            -.2124      .0958    -2.2177      .0266     -.4001     -.0247
+int_1        -.0762      .0993     -.7677      .4427     -.2708      .1184
+w            -.2457      .0936    -2.6248      .0087     -.4292     -.0622
+int_2        -.1447      .0709    -2.0415      .0412     -.2836     -.0058
+int_3        -.0734      .0916     -.8011      .4231     -.2530      .1062
+int_4        -.0935      .0723    -1.2933      .1959     -.2351      .0482
+
+Product terms key:
+
+ int_1    x           X     m
+ int_2    x           X     w
+ int_3    m           X     w
+ int_4    x           X     m           X     w
+
+*************************************************************************
+
+Conditional effect of X on Y at values of the moderator(s):
+          w          m     Effect         se          Z          p       LLCI       ULCI
+      .0124     -.9795     -.1384      .1444     -.9585      .3378     -.4214      .1446
+      .0124      .0188     -.2156      .0949    -2.2718      .0231     -.4017     -.0296
+      .0124     1.0171     -.2929      .1287    -2.2755      .0229     -.5451     -.0406
+     1.0131     -.9795     -.1916      .0974    -1.9669      .0492     -.3825     -.0007
+     1.0131      .0188     -.3622      .0683    -5.3054      .0000     -.4960     -.2284
+     1.0131     1.0171     -.5328      .0987    -5.3999      .0000     -.7261     -.3394
+     2.0137     -.9795     -.2447      .1313    -1.8641      .0623     -.5021      .0126
+     2.0137      .0188     -.5087      .1019    -4.9901      .0000     -.7085     -.3089
+     2.0137     1.0171     -.7727      .1575    -4.9065      .0000    -1.0813     -.4640
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+Conditional effect of X*M interaction at values of W:
+          w     Effect         se          Z          p       LLCI       ULCI
+      .0124     -.0774      .0986     -.7844      .4328     -.2707      .1160
+     1.0131     -.1709      .0705    -2.4248      .0153     -.3090     -.0328
+     2.0137     -.2644      .1033    -2.5607      .0104     -.4668     -.0620
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

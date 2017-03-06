@@ -1,0 +1,104 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 74
+    Y = y2
+    X = x
+   M1 = m1
+   M2 = m2
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: m1
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .7101      .5043      .9961   991.3306     1.0000   998.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0534      .0429    24.5777      .0000      .9693     1.1376
+x             .9637      .0306    31.4854      .0000      .9036     1.0238
+
+**************************************************************************
+Outcome: m2
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .7108      .5052     1.0095  1043.6906     1.0000   998.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9210      .0428    21.5225      .0000      .8370     1.0050
+x            -.9719      .0301   -32.3062      .0000    -1.0309     -.9128
+
+**************************************************************************
+Outcome: y2
+
+Coding of binary DV for analysis:
+        y2  Analysis
+       .00       .00
+      1.00      1.00
+
+Logistic Regression Summary
+       -2LL   Model LL    p-value   McFadden   CoxSnell   Nagelkrk          n
+  1284.8804   101.1580      .0000      .0730      .0962      .1283  1000.0000
+
+Model
+              coeff         se          Z          p       LLCI       ULCI
+constant      .8250      .1595     5.1736      .0000      .5125     1.1376
+m1           -.1416      .0833    -1.6996      .0892     -.3048      .0217
+m2           -.1948      .0835    -2.3328      .0197     -.3585     -.0311
+x            -.2641      .1493    -1.7687      .0769     -.5567      .0286
+int_1        -.1436      .0549    -2.6141      .0089     -.2512     -.0359
+int_2        -.1376      .0530    -2.5951      .0095     -.2416     -.0337
+
+Product terms key:
+
+ int_1    m1          X     x
+ int_2    m2          X     x
+
+******************** DIRECT AND INDIRECT EFFECTS *************************
+
+Conditional indirect effect(s) of X on Y at values of the moderator(s):
+
+Mediator
+            x     Effect    Boot SE   BootLLCI   BootULCI
+m1     -.0901     -.1239      .0907     -.3020      .0519
+m1      .9540     -.2684      .0697     -.4041     -.1322
+m1     1.9980     -.4129      .1043     -.6311     -.2223
+
+Mediator
+            x     Effect    Boot SE   BootLLCI   BootULCI
+m2     -.0901      .1773      .0861      .0106      .3459
+m2      .9540      .3170      .0717      .1774      .4590
+m2     1.9980      .4566      .0986      .2683      .6540
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** INDEX OF MODERATED MEDIATION ************************
+
+Mediator
+        Index   SE(Boot)   BootLLCI   BootULCI
+m1     -.1384      .0656     -.2701     -.0135
+m2      .1338      .0561      .0284      .2488
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Number of bootstrap samples for bias corrected bootstrap confidence intervals:
+     5000
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

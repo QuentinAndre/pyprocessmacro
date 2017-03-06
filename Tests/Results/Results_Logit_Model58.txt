@@ -1,0 +1,115 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 58
+    Y = y2
+    X = x
+   M1 = m1
+   M2 = m2
+    W = w
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: m1
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9487      .9001      .9973  3070.4477     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0855      .0593    18.2944      .0000      .9691     1.2020
+x             .9592      .0421    22.7899      .0000      .8766     1.0418
+w             .9677      .0448    21.6190      .0000      .8798     1.0555
+int_1        1.0050      .0311    32.3625      .0000      .9441     1.0660
+
+Product terms key:
+
+ int_1    x           X     w
+
+**************************************************************************
+Outcome: m2
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9489      .9005     1.0112  2797.1441     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9465      .0583    16.2349      .0000      .8321     1.0609
+x            -.9838      .0403   -24.3880      .0000    -1.0629     -.9046
+w           -1.0259      .0421   -24.3571      .0000    -1.1085     -.9432
+int_1        -.9878      .0307   -32.1447      .0000    -1.0481     -.9275
+
+Product terms key:
+
+ int_1    x           X     w
+
+**************************************************************************
+Outcome: y2
+
+Coding of binary DV for analysis:
+        y2  Analysis
+       .00       .00
+      1.00      1.00
+
+Logistic Regression Summary
+       -2LL   Model LL    p-value   McFadden   CoxSnell   Nagelkrk          n
+  1232.3505   152.9197      .0000      .1104      .1418      .1891  1000.0000
+
+Model
+              coeff         se          Z          p       LLCI       ULCI
+constant     1.0573      .1984     5.3306      .0000      .6686     1.4461
+m1           -.0368      .0863     -.4262      .6700     -.2060      .1324
+m2           -.1072      .0810    -1.3236      .1856     -.2659      .0515
+x            -.2221      .1384    -1.6051      .1085     -.4934      .0491
+w            -.4385      .1613    -2.7186      .0066     -.7546     -.1224
+int_2        -.2210      .0575    -3.8449      .0001     -.3337     -.1084
+int_3        -.2230      .0553    -4.0309      .0001     -.3314     -.1145
+
+Product terms key:
+
+ int_2    m1          X     w
+ int_3    m2          X     w
+
+******************** DIRECT AND INDIRECT EFFECTS *************************
+
+Direct effect of X on Y
+     Effect         SE          Z          p       LLCI       ULCI
+     -.2221      .1384    -1.6051      .1085     -.4934      .0491
+
+Conditional indirect effect(s) of X on Y at values of the moderator(s):
+
+Mediator
+            w     Effect    Boot SE   BootLLCI   BootULCI
+m1      .0124     -.0384      .0892     -.2238      .1342
+m1     1.0131     -.5155      .1232     -.7602     -.2836
+m1     2.0137    -1.4375      .2956    -2.0385     -.8758
+
+Mediator
+            w     Effect    Boot SE   BootLLCI   BootULCI
+m2      .0124      .1095      .0836     -.0517      .2745
+m2     1.0131      .6610      .1347      .4025      .9367
+m2     2.0137     1.6534      .3085     1.0736     2.2772
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Number of bootstrap samples for bias corrected bootstrap confidence intervals:
+     5000
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

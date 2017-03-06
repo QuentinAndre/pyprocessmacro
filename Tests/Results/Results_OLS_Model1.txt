@@ -1,0 +1,57 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 1
+    Y = y
+    X = x
+    M = m
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: y
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9237      .8531     1.0097  1877.8535     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9197      .0430    21.4126      .0000      .8354     1.0040
+m            1.0064      .0424    23.7380      .0000      .9232     1.0896
+x            1.0286      .0303    33.9907      .0000      .9692     1.0880
+int_1         .9670      .0300    32.2261      .0000      .9081     1.0259
+
+Product terms key:
+
+ int_1    x           X     m
+
+R-square increase due to interaction(s):
+         R2-chng          F        df1        df2          p
+int_1      .1505  1038.5213     1.0000   996.0000      .0000
+
+*************************************************************************
+
+Conditional effect of X on Y at values of the moderator(s):
+          m     Effect         se          t          p       LLCI       ULCI
+     -.9795      .0815      .0447     1.8230      .0686     -.0062      .1691
+      .0188     1.0468      .0302    34.6650      .0000      .9875     1.1060
+     1.0171     2.0121      .0403    49.9625      .0000     1.9331     2.0911
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

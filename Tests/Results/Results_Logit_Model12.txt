@@ -1,0 +1,198 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 12
+    Y = y2
+    X = x
+   M1 = m1
+   M2 = m2
+    W = w
+    Z = z
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: m1
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9921      .9843     1.0009  9964.4374     7.0000   992.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0978      .0939    11.6877      .0000      .9135     1.2822
+x             .9466      .0654    14.4710      .0000      .8182     1.0749
+w             .9653      .0706    13.6673      .0000      .8267     1.1039
+int_1        1.0014      .0473    21.1905      .0000      .9087     1.0942
+z             .9879      .0619    15.9599      .0000      .8665     1.1094
+int_2        1.0131      .0448    22.6254      .0000      .9252     1.1009
+int_3        1.0016      .0451    22.2154      .0000      .9131     1.0901
+int_4        1.0038      .0299    33.5929      .0000      .9452     1.0625
+
+Product terms key:
+
+ int_1    x           X     w
+ int_2    x           X     z
+ int_3    w           X     z
+ int_4    x           X     w           X     z
+
+**************************************************************************
+Outcome: m2
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9920      .9841     1.0067  8262.1236     7.0000   992.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .8708      .0752    11.5839      .0000      .7233     1.0184
+x           -1.0068      .0550   -18.3189      .0000    -1.1147     -.8990
+w           -1.0411      .0489   -21.2928      .0000    -1.1371     -.9452
+int_1        -.9637      .0374   -25.7996      .0000    -1.0369     -.8904
+z            -.9288      .0553   -16.7860      .0000    -1.0373     -.8202
+int_2        -.9786      .0372   -26.3307      .0000    -1.0516     -.9057
+int_3        -.9796      .0389   -25.1996      .0000    -1.0559     -.9033
+int_4       -1.0238      .0270   -37.9556      .0000    -1.0767     -.9709
+
+Product terms key:
+
+ int_1    x           X     w
+ int_2    x           X     z
+ int_3    w           X     z
+ int_4    x           X     w           X     z
+
+**************************************************************************
+Outcome: y2
+
+Coding of binary DV for analysis:
+        y2  Analysis
+       .00       .00
+      1.00      1.00
+
+Logistic Regression Summary
+       -2LL   Model LL    p-value   McFadden   CoxSnell   Nagelkrk          n
+  1221.4624   157.7676      .0000      .1144      .1460      .1951  1000.0000
+
+Model
+              coeff         se          Z          p       LLCI       ULCI
+constant     1.3103      .2169     6.0412      .0000      .8852     1.7354
+m1           -.0588      .0691     -.8512      .3947     -.1942      .0766
+m2            .0093      .0689      .1346      .8929     -.1258      .1444
+x            -.0527      .1717     -.3071      .7588     -.3893      .2838
+w            -.2092      .1618    -1.2927      .1961     -.5263      .1080
+int_5        -.1212      .1375     -.8817      .3780     -.3908      .1483
+z            -.0152      .1616     -.0942      .9250     -.3320      .3016
+int_6        -.2514      .1405    -1.7888      .0736     -.5268      .0240
+int_7        -.2431      .1389    -1.7508      .0800     -.5153      .0290
+int_8         .2841      .1226     2.3171      .0205      .0438      .5244
+
+Product terms key:
+
+ int_5    x           X     w
+ int_6    x           X     z
+ int_7    w           X     z
+ int_8    x           X     w           X     z
+
+******************** DIRECT AND INDIRECT EFFECTS *************************
+
+Conditional direct effect(s) of X on Y at values of the moderator(s):
+          w          z     Effect         SE          Z          p       LLCI       ULCI
+      .0124     -.0067     -.0526      .1716     -.3063      .7595     -.3890      .2838
+      .0124     1.0041     -.3031      .2194    -1.3812      .1675     -.7332      .1270
+      .0124     2.0150     -.5536      .3277    -1.6892      .0915    -1.1959      .0887
+     1.0131     -.0067     -.1758      .2125     -.8275      .4082     -.5922      .2406
+     1.0131     1.0041     -.1390      .3922     -.3544      .7231     -.9077      .6297
+     1.0131     2.0150     -.1022      .5925     -.1725      .8631    -1.2634     1.0590
+     2.0137     -.0067     -.2990      .3140     -.9525      .3411     -.9144      .3163
+     2.0137     1.0041      .0251      .5875      .0427      .9659    -1.1264     1.1766
+     2.0137     2.0150      .3492      .8887      .3930      .6944    -1.3925     2.0910
+
+Conditional indirect effect(s) of X on Y at values of the moderator(s):
+
+Mediator
+            w          z     Effect    Boot SE   BootLLCI   BootULCI
+m1      .0124     -.0067     -.0560      .0699     -.1967      .0781
+m1      .0124     1.0041     -.1170      .1453     -.4053      .1661
+m1      .0124     2.0150     -.1779      .2210     -.6136      .2533
+m1     1.0131     -.0067     -.1145      .1424     -.3943      .1611
+m1     1.0131     1.0041     -.2352      .2923     -.8127      .3326
+m1     1.0131     2.0150     -.3559      .4422    -1.2280      .5043
+m1     2.0137     -.0067     -.1730      .2151     -.5980      .2452
+m1     2.0137     1.0041     -.3534      .4393    -1.2190      .5014
+m1     2.0137     2.0150     -.5338      .6635    -1.8376      .7574
+
+Mediator
+            w          z     Effect    Boot SE   BootLLCI   BootULCI
+m2      .0124     -.0067     -.0094      .0717     -.1479      .1344
+m2      .0124     1.0041     -.0187      .1424     -.2917      .2640
+m2      .0124     2.0150     -.0280      .2131     -.4361      .3930
+m2     1.0131     -.0067     -.0183      .1392     -.2841      .2578
+m2     1.0131     1.0041     -.0372      .2833     -.5804      .5228
+m2     1.0131     2.0150     -.0561      .4274     -.8740      .7890
+m2     2.0137     -.0067     -.0272      .2068     -.4227      .3816
+m2     2.0137     1.0041     -.0557      .4242     -.8683      .7828
+m2     2.0137     2.0150     -.0842      .6417    -1.3119     1.1838
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+-----
+Indirect effect of highest order product:
+
+Mediator
+       Effect   SE(Boot)   BootLLCI   BootULCI
+m1     -.0590      .0735     -.2049      .0843
+m2     -.0095      .0726     -.1492      .1344
+
+************* MODERATED AND CONDITIONAL MODERATED MEDIATION **************
+
+INDEX OF MODERATED MODERATED MEDIATION:
+
+Mediator
+        Index   SE(Boot)   BootLLCI   BootULCI
+m1     -.0590      .0735     -.2049      .0843
+m2     -.0095      .0726     -.1492      .1344
+
+INDEX OF CONDITIONAL MODERATED MEDIATION:
+
+Moderator:
+ w
+
+Mediator
+            z      Index   SE(Boot)   BootLLCI   BootULCI
+m1     -.0067     -.0585      .0728     -.2028      .0831
+m1     1.0041     -.1182      .1469     -.4085      .1672
+m1     2.0150     -.1778      .2211     -.6151      .2514
+m2     -.0067     -.0089      .0676     -.1397      .1236
+m2     1.0041     -.0185      .1408     -.2897      .2611
+m2     2.0150     -.0281      .2142     -.4409      .3955
+
+Moderator:
+ z
+
+Mediator
+            w      Index   SE(Boot)   BootLLCI   BootULCI
+m1      .0124     -.0603      .0750     -.2072      .0861
+m1     1.0131     -.1194      .1484     -.4117      .1697
+m1     2.0137     -.1784      .2218     -.6144      .2543
+m2      .0124     -.0092      .0700     -.1442      .1294
+m2     1.0131     -.0187      .1426     -.2918      .2623
+m2     2.0137     -.0282      .2151     -.4405      .3964
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Number of bootstrap samples for bias corrected bootstrap confidence intervals:
+     5000
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

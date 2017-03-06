@@ -1,0 +1,69 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 2
+    Y = y
+    X = x
+    M = m
+    W = w
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: y
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9650      .9312     1.0114  2399.7379     5.0000   994.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9437      .0587    16.0711      .0000      .8284     1.0589
+m            1.0051      .0424    23.6820      .0000      .9219     1.0884
+x            1.0190      .0410    24.8814      .0000      .9387     1.0994
+int_1         .9678      .0301    32.1151      .0000      .9087     1.0270
+w             .9758      .0422    23.1478      .0000      .8931     1.0586
+int_2        1.0098      .0309    32.6702      .0000      .9492     1.0705
+
+Product terms key:
+
+ int_1    x           X     m
+ int_2    x           X     w
+
+R-square increase due to interaction(s):
+         R2-chng          F        df1        df2          p
+int_1      .0703  1031.3770     1.0000   994.0000      .0000
+int_2      .0735  1067.3430     1.0000   994.0000      .0000
+Both       .1334   973.1780     2.0000   994.0000      .0000
+
+*************************************************************************
+
+Conditional effect of X on Y at values of the moderator(s):
+          w          m     Effect         se          t          p       LLCI       ULCI
+      .0124     -.9795      .0837      .0535     1.5638      .1182     -.0213      .1886
+      .0124      .0188     1.0498      .0406    25.8439      .0000      .9701     1.1295
+      .0124     1.0171     2.0160      .0474    42.5171      .0000     1.9229     2.1090
+     1.0131     -.9795     1.0941      .0446    24.5518      .0000     1.0067     1.1816
+     1.0131      .0188     2.0603      .0303    67.9413      .0000     2.0008     2.1198
+     1.0131     1.0171     3.0264      .0408    74.2047      .0000     2.9464     3.1065
+     2.0137     -.9795     2.1045      .0550    38.2788      .0000     1.9967     2.2124
+     2.0137      .0188     3.0707      .0458    66.9744      .0000     2.9807     3.1607
+     2.0137     1.0171     4.0369      .0547    73.8053      .0000     3.9295     4.1442
+
+Values for quantitative moderators are the mean and plus/minus one SD from mean.
+Values for dichotomous moderators are the two values of the moderator.
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----

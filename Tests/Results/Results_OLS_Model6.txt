@@ -1,0 +1,85 @@
+﻿Run MATRIX procedure:
+
+************** PROCESS Procedure for SPSS Release 2.16.3 *****************
+
+          Written by Andrew F. Hayes, Ph.D.       www.afhayes.com
+    Documentation available in Hayes (2013). www.guilford.com/p/hayes3
+
+**************************************************************************
+Model = 6
+    Y = y
+    X = x
+   M1 = m1
+   M2 = m2
+
+Sample size
+       1000
+
+**************************************************************************
+Outcome: m1
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .7101      .5043      .9961   991.3306     1.0000   998.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0534      .0429    24.5777      .0000      .9693     1.1376
+x             .9637      .0306    31.4854      .0000      .9036     1.0238
+
+**************************************************************************
+Outcome: m2
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .6957      .4840     1.0099   435.8088     2.0000   997.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant      .9476      .0546    17.3643      .0000      .8405     1.0547
+m1            .9747      .0330    29.5223      .0000      .9099     1.0395
+x            -.9475      .0442   -21.4386      .0000    -1.0342     -.8608
+
+**************************************************************************
+Outcome: y
+
+Model Summary
+          R       R-sq        MSE          F        df1        df2          p
+      .9486      .8999     1.0292  2596.2785     3.0000   996.0000      .0000
+
+Model
+              coeff         se          t          p       LLCI       ULCI
+constant     1.0079      .0667    15.1025      .0000      .8769     1.1388
+m1           1.0059      .0448    22.4540      .0000      .9180     1.0938
+m2            .9811      .0311    31.5778      .0000      .9201     1.0420
+x            1.0523      .0566    18.5862      .0000      .9412     1.1634
+
+******************** DIRECT AND INDIRECT EFFECTS *************************
+
+Direct effect of X on Y
+     Effect         SE          t          p       LLCI       ULCI
+     1.0523      .0566    18.5862      .0000      .9412     1.1634
+
+Indirect effect(s) of X on Y
+           Effect    Boot SE   BootLLCI   BootULCI
+Total:      .9613      .0795      .8125     1.1252
+Ind1 :      .9694      .0515      .8746     1.0771
+Ind2 :      .9215      .0533      .8214     1.0326
+Ind3 :     -.9296      .0519    -1.0296     -.8277
+
+Indirect effect key
+ Ind1 :   x        ->       m1       ->       y
+ Ind2 :   x        ->       m1       ->       m2       ->       y
+ Ind3 :   x        ->       m2       ->       y
+
+******************** ANALYSIS NOTES AND WARNINGS *************************
+
+Number of bootstrap samples for bias corrected bootstrap confidence intervals:
+     5000
+
+Level of confidence for all confidence intervals in output:
+    95.00
+
+NOTE: All standard errors for continuous outcome models are based on the HC3 estimator
+
+------ END MATRIX -----
