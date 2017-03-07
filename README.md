@@ -325,13 +325,13 @@ plt.show()
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", col="SkillRelevance")
 plt.show()
 ````
-![ColCodedModerator](Images/Ex4.png)
+![ColCodedModerator](Images/Ex3.png)
 ````python
 # Display the values for SkillRelevance on vertical plots instead.
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", row="SkillRelevance")
 plt.show()
 ````
-![RowCodedModerator](Images/Ex3.png)
+![RowCodedModerator](Images/Ex4.png)
 ## B. Change the spotlight values
 
 By default, the spotlight values used to plot the effects are the same as the ones passed when initializing Process.
