@@ -5,7 +5,7 @@ PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 
 The Process Macro for SAS and SPSS, and its associated files, are copyrighted by Andrew F. Hayes. The original code
 must not be edited or modified, and must not be distributed outside of 
-[http://www.processmacro.org](www.processmacro.org).
+[http://www.processmacro.org](http://www.processmacro.org).
  
 Because PyProcessMacro is a complete reimplementation of the Process Macro, and was not based on the original 
 code, permission was generously granted by Andrew F. Hayes to distribute PyProcessMacro under a MIT license.
@@ -203,12 +203,13 @@ model_medskills = p.outcome_models["MediationSkills"] # The model for the outcom
 
 model_medskills.summary() # Print the summary for this model
 
-df_params_med1 = model_medskills.coeff_summary() # Store the parameter estimates into a DataFrame for inspection.
+df_params_med1 = model_medskills.coeff_summary() # Store the DataFrame of estimates into a variable.
 
 med1_R2 = model_medskills.estimation_results["R2"] # Store the R² of the model into a variable.
 ````
 
-Note that the methods belong to the `OutcomeModel` objects! If you call `p.coeff_summary()`, you will get an error.
+Note that the methods are called from the `model_medskills` object! If you call `p.coeff_summary()`, 
+you will get an error.
 
 ## C. `direct_model`
 
@@ -225,10 +226,11 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 
 direct_model = p.direct_model # The model for the direct effect
 
-df_params_direct = direct_model.coeff_summary() # Store the parameter estimates into a DataFrame for inspection.
+df_params_direct = direct_model.coeff_summary() # Store the DataFrame of estimates into a variable.
 ````
 
-Note that the methods belong to the `DirectEffectModel` object! If you call `p.coeff_summary()`, you will get an error.
+Note that the methods are called from the `direct_model` object! If you call `p.coeff_summary()`, you will get an 
+error.
 
 
 ## D. `indirect_model`
@@ -253,10 +255,11 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 
 indirect_model = p.indirect_model # The model for the direct effect
 
-df_params_direct = indirect_model.coeff_summary() # Store the parameter estimates into a DataFrame for inspection.
+df_params_direct = indirect_model.coeff_summary() # Store the DataFrame of estimates into a variable.
 ````
 
-Note that the methods belong to the `IndirectEffectModel` object! If you call `p.coeff_summary()`, you will get an error.
+Note that the methods are called from the `indirect_model` object! If you call `p.coeff_summary()`, you will get an 
+error.
 
 # 5. Bootstrap samples estimates
 
@@ -310,7 +313,8 @@ plt.show()
 ![BasicExample](Images/Ex1.png)
 
 ````python
-# Conditional indirect effects through MediationSkills, at values of Motivation (x-axis) and SkillRelevance (color-coded)
+# Conditional indirect effects through MediationSkills, at values of Motivation (x-axis) and 
+# SkillRelevance (color-coded)
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance") 
 g.add_legend(title="") # Add the legend for the color-coding
 plt.show()
@@ -390,21 +394,24 @@ moderators  will assume a value of 0 when computing the direct/indirect effects.
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
-# SkillRelevance is a moderator of the indirect path, but it is not mentioned as an argument in the plotting function!
+# SkillRelevance is a moderator of the indirect path, but is not mentioned as an argument in the plotting function!
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation") 
 plt.show() # This plot represents the "partial" conditional indirect effect, when SkillRelevance is evaluated at 0.
 ````
 ![PartialPlotDefault](Images/Ex10.png)
 
 
-If you want the omitted moderator(s) to have a different value than 0, you must pass this value as a key in the 
-`mods_at` dictionary:
+If you want the omitted moderator(s) to have a different value than 0, you must pass a unique value for each moderator
+as a key in the `mods_at` dictionary:
 
 ````python
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", mods_at={"SkillRelevance":[-5]}) 
 plt.show() # This plot represents the "partial" conditional indirect effect, when SkillRelevance is evaluated at -5.
 ````
 ![PartialPlotCustom](Images/Ex11.png)
+
+Do not pass multiple values in `mods_at` if you do not intend to represent this moderator on the plot, as the graph
+will then not be interpretable!
 
 # E. Customize the appearance of the plots
 
@@ -425,9 +432,9 @@ df = pd.read_csv("MyDataset.csv")
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 
-plot_kws = {'lw': 5}  # Plot arguments:  Make the lines bolder
-err_kws = {'capthick': 5, 'ecolor': 'black', 'elinewidth': 5, 'capsize': 5}  # Error arguments: Make the CI bolder and black
-facet_kws = {'aspect': 1}  # Make the FacetGrid a square rather than a rectangle
+plot_kws = {'lw': 5}  # Plot:  Make the lines bolder
+err_kws = {'capthick': 5, 'ecolor': 'black', 'elinewidth': 5, 'capsize': 5}  # Errors: Make the CI bolder and black
+facet_kws = {'aspect': 1}  #Grid: Make the FacetGrid a square rather than a rectangle
 
 
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", errstyle="ci",
@@ -436,7 +443,7 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", errstyle
 ![PlotCustomKws](Images/Ex12.png)
 
 # 7. About
-PyProcessMacro was developed by Quentin André during his Ph.D at INSEAD. His work on this library was made possible
-by the financial support of INSEAD and the ADLPartner Ph.D award.
+PyProcessMacro was developed by Quentin André during his PhD at INSEAD. His work on this library was made possible
+by the financial support of INSEAD and the ADLPartner PhD award.
 
 
