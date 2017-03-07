@@ -4,7 +4,8 @@ PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 # 1. Copyright Notice for the original Process Macro
 
 The Process Macro for SAS and SPSS, and its associated files, are copyrighted by Andrew F. Hayes. The original code
-must not be edited or modified, and must not be distributed outside of [www.processmacro.org](www.processmacro.org).
+must not be edited or modified, and must not be distributed outside of 
+[http://www.processmacro.org](www.processmacro.org).
  
 Because PyProcessMacro is a complete reimplementation of the Process Macro, and was not based on the original 
 code, permission was generously granted by Andrew F. Hayes to distribute PyProcessMacro under a MIT license.
@@ -67,7 +68,10 @@ You can install PyProcessMacro with pip:
 
     pip install pyprocessmacro
 
-## A. Minimal example:
+## A. Minimal example
+
+The basic syntax for PyProcessMacro is the following:
+
 ````python
 from pyprocessmacro import Process
 import pandas as pd
@@ -76,6 +80,8 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
             m=["MediationSkills", "ModerationSkills"])
 p.summary()
 ````
+
+[Click to see a sample output!](SampleOutput.md)
 
 As you can see, the syntax for PyProcessMacro is (almost) identical to that of Process. Unless this documentation
  mentions otherwise, you can assume that all the options/keywords from Process exist in PyProcessMacro.
