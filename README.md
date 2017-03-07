@@ -42,14 +42,13 @@ The following changes and improvements have been made from the original Process 
   * Variable names can be of any length, and even include spaces and special characters.
   * All mediation models support an infinite number of mediators (versus a maximum of 10 in Process).
   * Normal theory tests for the indirect effect(s) are not reported, as the bootstrapping approach is now widely
-  accepted and proved to be superior.
-  * Richer plotting capabilities: PyProcessMacro can generate the plot of direct and indirect effects at various levels
+  accepted and in most cases more robust.
+  * Plotting capabilities: PyProcessMacro can generate the plot of direct and indirect effects at various levels
   of the moderators. See the documentation for plot_indirect_effects() and plot_direct_effects().
-  * Faster estimation process: PyProcessMacro leverages the capabilities of NumPy to efficiently compute a large number
+  * Fast estimation process: PyProcessMacro leverages the capabilities of NumPy to efficiently compute a large number
   of bootstrap estimates, and dramatically speed up the estimation of complex models.
-  * Transparent bootstrapping: when bootstrap samples are discarded because of numerical instability, PyProcessMacro 
-  reports it.
-
+  * Transparent bootstrapping: PyProcessMacro explicitely reports the number of bootstrap samples that have been 
+  discarded because of numerical instability.
 
 In the current version, the following features have not yet been ported to PyProcessMacro:
   * Support for categorical independent variables.
@@ -443,7 +442,10 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", errstyle
 ![PlotCustomKws](Images/Ex12.png)
 
 # 7. About
-PyProcessMacro was developed by Quentin André during his PhD at INSEAD. His work on this library was made possible
-by the financial support of INSEAD and the ADLPartner PhD award.
+PyProcessMacro was developed by Quentin André during his PhD in Marketing at INSEAD Business School, France. 
+
+His work on this library was made possible by Andrew F. Hayes' 
+[excellent book](http://afhayes.com/introduction-to-mediation-moderation-and-conditional-process-analysis.html), 
+by the financial support of INSEAD and by the ADLPartner PhD award.
 
 
