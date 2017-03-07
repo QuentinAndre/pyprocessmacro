@@ -352,9 +352,9 @@ The display of confidence intervals for the direct/indirect effects can be custo
 * `errstyle="band"` (default) plots a continuous error band between the lower and higher confidence interval. This 
 representation works well when the moderator displayed on the x-axis is continuous (e.g. age), as it allows you to 
 visualize the error at all levels of the moderator.
- * `errstyle="ci"` plots an error bar at each value of the moderator on x-axis. It works well when the moderator 
+* `errstyle="ci"` plots an error bar at each value of the moderator on x-axis. It works well when the moderator 
  displayed on the x-axis is dichotomous or has few values (e.g. gender), as it reduces clutter.
- * `errstyle="none"` does not show the error on the plot.
+* `errstyle="none"` does not show the error on the plot.
  
  ````python
 # CI for dichotomous moderator
