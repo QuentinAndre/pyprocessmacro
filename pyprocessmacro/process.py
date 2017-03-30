@@ -994,8 +994,8 @@ class Process(object):
             mods_at_symb = {}
 
         get_effects = partial(self.indirect_model._get_conditional_indirect_effects, med_index)
-        g = self._plot_effects(get_effects, **var_kwargs, mods_at=mods_at_symb, errstyle=errstyle,
-                               hue_format=hue_format, facet_kws=facet_kws, plot_kws=plot_kws, err_kws=err_kws)
+        g = self._plot_effects(get_effects, **dict(var_kwargs, mods_at=mods_at_symb, errstyle=errstyle,
+                               hue_format=hue_format, facet_kws=facet_kws, plot_kws=plot_kws, err_kws=err_kws))
         return g
 
     def plot_direct_effects(self, x=None, hue=None, row=None, col=None, mods_at=None,
@@ -1080,8 +1080,8 @@ class Process(object):
             mods_at_symb = {}
 
         get_effects = self.direct_model._get_conditional_direct_effects
-        g = self._plot_effects(get_effects, **var_kwargs, mods_at=mods_at_symb, errstyle=errstyle,
-                               hue_format=hue_format, facet_kws=facet_kws, plot_kws=plot_kws, err_kws=err_kws)
+        g = self._plot_effects(get_effects, **dict(var_kwargs, mods_at=mods_at_symb, errstyle=errstyle,
+                               hue_format=hue_format, facet_kws=facet_kws, plot_kws=plot_kws, err_kws=err_kws))
         return g
 
     def _plot_effects(self, get_effects, x=None, hue=None, row=None, col=None, mods_at=None,

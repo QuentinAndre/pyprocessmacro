@@ -159,15 +159,21 @@ def eval_expression(expr, values=None):
 
 def plot_errorbars(x, y, yerrlow, yerrhigh, plot_kws=None, err_kws=None, *args, **kwargs):
     yerr = [yerrlow, yerrhigh]
-    err_kws = {**kwargs, **err_kws, 'marker': "", 'fmt':'none', 'label':'', "zorder":3}
-    plot_kws = {**kwargs, **plot_kws}
-    plt.plot(x, y, **plot_kws)
-    plt.errorbar(x, y, yerr, **err_kws)
+    err_kws_final = kwargs.copy()
+    err_kws_final.update(err_kws)
+    err_kws_final.update({'marker': "", 'fmt':'none', 'label':'', "zorder":3})
+    plot_kws_final = kwargs.copy()
+    plot_kws_final.update(plot_kws)
+    plt.plot(x, y, **plot_kws_final)
+    plt.errorbar(x, y, yerr, **err_kws_final)
     return None
 
 def plot_errorbands(x, y, llci, ulci, plot_kws=None, err_kws=None, *args, **kwargs):
-    err_kws = {**kwargs, **err_kws, 'label':''}
-    plot_kws = {**kwargs, **plot_kws}
-    plt.plot(x, y, **plot_kws)
-    plt.fill_between(x, llci, ulci, **err_kws)
+    err_kws_final = kwargs.copy()
+    err_kws_final.update(err_kws)
+    err_kws_final.update({'label':''})
+    plot_kws_final = kwargs.copy()
+    plot_kws_final.update(plot_kws)
+    plt.plot(x, y, **plot_kws_final)
+    plt.fill_between(x, llci, ulci, **err_kws_final)
     return None
