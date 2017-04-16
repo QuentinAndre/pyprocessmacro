@@ -892,11 +892,11 @@ class OLSOutcomeModel(BaseOutcomeModel):
             vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
         elif errortype == 'HC0':
             sq_resid = (resid ** 2).squeeze()
-            vcv = dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid)), x), inv_xx)
+            vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
         elif errortype == 'HC1':
             sq_resid = (resid ** 2).squeeze()
             vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * \
-                  dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid)), x), inv_xx)
+                  dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
         elif errortype == 'HC2':
             sq_resid = (resid ** 2).squeeze()
             H = (x.dot(inv_xx) * x).sum(axis=-1)
