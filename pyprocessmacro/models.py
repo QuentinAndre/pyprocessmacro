@@ -903,8 +903,8 @@ class OLSOutcomeModel(BaseOutcomeModel):
             vcv = dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid / (1 - H))), x), inv_xx)
         elif errortype == 'HC3':
             sq_resid = (resid ** 2).squeeze()
-            H = np.diagonal(dot(dot(x, inv_xx), x.T))
-            vcv = dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid / ((1 - H) ** 2))), x), inv_xx)
+            H = (x.dot(inv_xx) * x).sum(axis=-1)
+            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / ((1 - H) ** 2)), x), inv_xx)
         else:
             raise ValueError("The covariance type {} is not supported. Please specify 'standard', 'HC0'"
                              "'HC1', 'HC2', or 'HC3".format(errortype))
