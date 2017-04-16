@@ -899,8 +899,8 @@ class OLSOutcomeModel(BaseOutcomeModel):
                   dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid)), x), inv_xx)
         elif errortype == 'HC2':
             sq_resid = (resid ** 2).squeeze()
-            H = np.diagonal(dot(dot(x, inv_xx), x.T))
-            vcv = dot(dot(dot(dot(inv_xx, x.T), np.diag(sq_resid / (1 - H))), x), inv_xx)
+            H = (x.dot(inv_xx) * x).sum(axis=-1)
+            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / (1 - H)), x), inv_xx)
         elif errortype == 'HC3':
             sq_resid = (resid ** 2).squeeze()
             H = (x.dot(inv_xx) * x).sum(axis=-1)
