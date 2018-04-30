@@ -290,7 +290,7 @@ class Process(object):
             If True, the HC3 estimator will be used for the variance/covariance matrix of the parameters.
         :param controls: list of string
             A list of control variables to include to the model(s).
-        :param controls_in: "both", "x_to_m", "all_to_y"
+        :param controls_in: "all", "x_to_m", "all_to_y"
             If 'x_to_m", the controls are added to all the equations from X to the mediator(s) M.
             If 'all_to_y", the controls are added to the equation from X and M to Y.
             if 'all", the controls are added to all equations.
@@ -480,6 +480,8 @@ class Process(object):
             errstr += "The option 'jn' must be 0 or 1.\n"
         if options["logit"] not in [True, False]:
             errstr += "The option 'logit' must be 0 or 1.\n"
+        if options["controls_in"] not in ["all", "x_to_tm", "all_to_y"]:
+            errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
             errstr += "The option 'modval' must be a dictionary.\n"
         else:
@@ -701,6 +703,7 @@ class Process(object):
                 eqlist[0] = (y, full_path_to_y)
                 eqlist[1:] = (Mi, full_path_to_M) for i in M1, M2, ... MN
         """
+
         all_to_y_base = self._raw_equations["all_to_y"]
         x_to_m_base = self._raw_equations["x_to_m"]
         eqs_dict = self._raw_equations
@@ -1104,6 +1107,7 @@ class Process(object):
             x_values = np.linspace(data[x].min(), data[x].max(), 100)
 
         # Values for hue
+        print(hue)
         if isinstance(hue, str):
             huevar1 = hue
             huevar2 = None
@@ -1124,6 +1128,7 @@ class Process(object):
             huevar2 = None
             hue1_values = [0]
             hue2_values = [0]
+        print(huevar1, huevar2)
 
         # Values for col and row
         col_values = mods_at.get(col, self.spotlight_values.get(col)) if col else [0]
@@ -1134,6 +1139,15 @@ class Process(object):
         other_names = [k for k in mods_at.keys() if k not in var_names]
 
         other_values = [mods_at[k] for k in other_names] # TODO: Add failsafe here.
+        print(mods_at)
+        print(self.spotlight_values)
+        print(other_values)
+        print(x_values)
+        print(hue1_values)
+        print(hue2_values)
+        print(col_values)
+        print(row_values)
+        print(*other_values)
 
         values = np.array([i for i in product(x_values, hue1_values, hue2_values, col_values,
                                               row_values, *other_values)])

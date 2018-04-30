@@ -102,7 +102,7 @@ the "controls" argument.
 The equation(s) to which the controls are added is specified through the `controls_in` argument:
   * `x_to_m` means that the controls will be added in the path from the IV to the mediator(s) only.
   * `all_to_y` means that the controls will be added in the path from the IV and the mediators to the DV only. 
-  * `both` means that the controls will be added in both equations.
+  * `all` means that the controls will be added in all equations.
   
 The ability to specify a different list of control for each equation is coming in the next release of PyProcessMacro.
   
@@ -110,7 +110,7 @@ The ability to specify a different list of control for each equation is coming i
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"],
             controls=["Control1", "Control2"],
-            controls_in="both")
+            controls_in="all")
 p.summary()
 ````
 
