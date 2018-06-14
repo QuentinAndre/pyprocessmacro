@@ -576,7 +576,10 @@ class Process(object):
 
         terms = y_exogvars + m_exogvars
         threeway = any([1 if len(term.split("*")) == 3 else 0 for term in terms])  # TODO: Ugly hack
-        if n_mods == 2:
+
+        if n_mods == 1:
+                return ["MM"]
+        elif n_mods == 2:
             if (n_mods_m == 1) or threeway:  # Moderators on two different paths
                 return ["MMM", "CMM"]
             else:

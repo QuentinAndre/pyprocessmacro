@@ -430,6 +430,47 @@ class ParallelMediationModel(object):
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
 
+
+    def _MM_index(self):
+        """
+        The Moderated Mediation (MM) index is computed when exactly one moderator is present on the
+        mediation path.
+        It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
+        moderator on the indirect effect).
+        """
+        if "MM" not in self._analysis_list:
+            raise ValueError("This model does not report the Index for Moderated Mediation.")
+
+        conf = self._options["conf"]
+        n_boots = self._options["boot"]
+        mod = self._moderators_symb  # Only one moderator
+
+        dict_baseline = dict([mod, 0])
+        e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+
+        dict_effect = dict([mod, 1])
+        e_effect, be_effect = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+
+        effects, se, llci, ulci = np.empty((4, self._n_meds))
+
+        for i in range(self._n_meds):
+            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
+            e_effect[i], be_effect[i], *_ = self._indirect_effect_at(i, dict_effect)
+
+            e_mm = e_effect[i] - e_baseline[i]  # Moderator at 1 vs. Moderator at 0
+            be_mm = be_effect[i] - be_baseline[i]
+
+            effects[i] = e_mm
+            se[i] = be_mm.std(ddof=1)
+            if self._options["percent"]:
+                llci[i], ulci[i] = percentile_ci(be_mm, conf)
+            else:
+                llci[i], ulci[i] = bias_corrected_ci(e_mm, be_mm, conf)
+
+        statistics = [i.flatten() for i in [effects, se, llci, ulci]]
+
+        return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
+
     def _PMM_index(self):
         """
         The Partial Moderated Mediation (PMM) index is only computed when exactly two moderators are present on the
@@ -623,6 +664,28 @@ class ParallelMediationModel(object):
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
         return df.apply(pd.to_numeric, args=["ignore"])
 
+    def _MM_index_wrapper(self):
+        """
+        A wrapper for the Moderated Mediation index.
+        :return: pd.DataFrame
+            A DataFrame of effects, se, llci, and ulci, for the PMM index.
+        """
+        symb_to_var = self._symb_to_var
+        results = self._MM_index()
+        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        cols_stats = ["Index", "Boot SE", "LLCI", "ULCI"]
+
+        mod_names = [[symb_to_var.get(i, i) for i in self._moderators_symb]]
+        med_names = [[symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]]
+        values = mod_names + med_names
+        rows_levels = np.array([i for i in product(*values)])
+        cols_levels = ["Moderator", "Mediator"]
+
+        rows = np.concatenate([rows_levels, rows_stats], axis=1)
+        cols = cols_levels + cols_stats
+        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        return df.apply(pd.to_numeric, args=["ignore"])
+
     def _PMM_index_wrapper(self):
         """
         A wrapper for the Partial Moderated Mediation index.
@@ -731,7 +794,8 @@ class ParallelMediationModel(object):
         """
         prec = self._options["precision"]
         float_format = partial('{:.{prec}f}'.format, prec=prec)
-        analysis_func = {"PMM": ('PARTIAL MODERATED MEDIATION', self._PMM_index_wrapper),
+        analysis_func = {"MM": ('MODERATED MEDIATION', self._MM_index_wrapper),
+                         "PMM": ('PARTIAL MODERATED MEDIATION', self._PMM_index_wrapper),
                          "MMM": ('MODERATED MODERATED MEDIATION', self._MMM_index_wrapper),
                          "CMM": ('CONDITIONAL MODERATED MEDIATION', self._CMM_index_wrapper)}
         symb_to_var = self._symb_to_var
