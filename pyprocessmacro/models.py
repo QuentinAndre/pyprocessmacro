@@ -443,12 +443,12 @@ class ParallelMediationModel(object):
 
         conf = self._options["conf"]
         n_boots = self._options["boot"]
-        mod = self._moderators_symb  # Only one moderator
+        (mod,) = self._moderators_symb  # Only one moderator
 
-        dict_baseline = dict([mod, 0])
+        dict_baseline = dict([[mod, 0]])
         e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_effect = dict([mod, 1])
+        dict_effect = dict([[mod, 1]])
         e_effect, be_effect = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
         effects, se, llci, ulci = np.empty((4, self._n_meds))

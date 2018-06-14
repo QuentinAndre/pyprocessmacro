@@ -8,5 +8,5 @@ from .process import Process
 
 __all__ = ['Process']
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 

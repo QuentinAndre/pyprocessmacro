@@ -1110,7 +1110,6 @@ class Process(object):
             x_values = np.linspace(data[x].min(), data[x].max(), 100)
 
         # Values for hue
-        print(hue)
         if isinstance(hue, str):
             huevar1 = hue
             huevar2 = None
@@ -1131,7 +1130,6 @@ class Process(object):
             huevar2 = None
             hue1_values = [0]
             hue2_values = [0]
-        print(huevar1, huevar2)
 
         # Values for col and row
         col_values = mods_at.get(col, self.spotlight_values.get(col)) if col else [0]
@@ -1142,15 +1140,6 @@ class Process(object):
         other_names = [k for k in mods_at.keys() if k not in var_names]
 
         other_values = [mods_at[k] for k in other_names] # TODO: Add failsafe here.
-        print(mods_at)
-        print(self.spotlight_values)
-        print(other_values)
-        print(x_values)
-        print(hue1_values)
-        print(hue2_values)
-        print(col_values)
-        print(row_values)
-        print(*other_values)
 
         values = np.array([i for i in product(x_values, hue1_values, hue2_values, col_values,
                                               row_values, *other_values)])
