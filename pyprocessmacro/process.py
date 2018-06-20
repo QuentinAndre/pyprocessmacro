@@ -893,8 +893,8 @@ class Process(object):
             raise NotImplementedError("This model does not have a mediation. As such, no bootstrap samples were "
                                       "generated.")
         iem = self.indirect_model
-        boot_betas_y = iem.boot_betas_y
-        boot_betas_m = iem.boot_betas_m
+        boot_betas_y = iem._boot_betas_y
+        boot_betas_m = iem._boot_betas_m
 
         cols_y = [self._symb_to_var[t] for t in iem._exog_terms_y]
         df = pd.DataFrame(boot_betas_y, columns=cols_y)
