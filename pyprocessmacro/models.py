@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from .utils import fast_OLS, fast_optimize, bootstrap_sampler, eval_expression, bias_corrected_ci, z_score, \
-    percentile_ci
+    percentile_ci, find_significance_region
 import scipy.stats as stats
 from numpy.linalg import inv, LinAlgError
 from numpy import dot
@@ -10,13 +10,12 @@ import pandas as pd
 from functools import partial
 import warnings
 
-
 class BaseLogit(object):
     """
     A convenience parent class for the methods used in Logistic models.
     """
 
-    def __init__(self, endog, exog, options):
+    def __init__(self, endog: np.array, exog: np.array, options: dict) -> None:
         self._endog = endog
         self._exog = exog
         self._n_obs = exog.shape[0]
@@ -26,11 +25,11 @@ class BaseLogit(object):
         self._options = options
 
     @staticmethod
-    def _cdf(X):
+    def _cdf(X: np.array) -> np.array:
         """
         The CDF of the logistic function.
-        :param X: A scalar
-        :return: A scalar
+        :param X: Values at which to evaluate the CDF
+        :return: The CDF of the logistic function, evaluated at X
         """
         idx = X > 0
         out = np.empty(X.size, dtype=float)
@@ -97,7 +96,7 @@ class ParallelMediationModel(object):
                  n_meds, analysis_list, symb_to_ind, symb_to_var, options=None):
         """
         :param data: array
-            An NxK array of data
+            NxK array of data
         :param exog_terms_y: list of strings
             Symbols of exogenous terms for the estimation of the outcome Y
         :param exog_terms_m: list of strings
@@ -108,7 +107,7 @@ class ParallelMediationModel(object):
             The spotlight values of the moderator(s)
         :param n_meds: int
             Number of mediator(s)
-        :param analysis_list: list of ["PMM", "CMM", "MMM"]
+        :param analysis_list: list of ["MM", "PMM", "CMM", "MMM"]
             The list of additional analysis to conduct.
         :param symb_to_ind: dict of int
             Dictionary mapping the symbols to the indices of the variable in the data
@@ -214,7 +213,7 @@ class ParallelMediationModel(object):
                     m_b = self._compute_betas_m(m_e, m_x)
                     boot_betas_m[j][boot_ind] = m_b
                 boot_ind += 1
-            except LinAlgError: # Hessian (Logit) or X'X (OLS) cannot be inverted
+            except LinAlgError:  # Hessian (Logit) or X'X (OLS) cannot be inverted
                 n_fail_samples += 1
 
         return boot_betas_y, boot_betas_m, n_fail_samples
@@ -241,7 +240,7 @@ class ParallelMediationModel(object):
         [[ 0, 1 ], # Value of the Constant term : 0*1 = 0
          [ 1, 1 ], # Value of X term : 1*1 = 1
          [ 0, W ], # Value of the W term: 0*W = 0
-         [ 1, W ]] # Value of the X*W: 1*W = W
+         [ 1, W ]] # Value of the X*W term: 1*W = W
 
         The advantage of this matrix is that it is a symbolic expression, in which we can substitute for the values of
         the moderators, and then take the product of columns to obtain the numerical representation of the derivative
@@ -320,8 +319,6 @@ class ParallelMediationModel(object):
         Return the indirect effects for all combinations of the moderators mod_symb specified in mod_values.
         :param med_index: int
             Index of the mediator.
-        :param mod_names: array
-            An array of moderator names
         :param mod_values: matrix
             A (N_Comb x N_Mods) matrix of all combinations of values for all moderator(s)
         :return: e: array
@@ -421,15 +418,14 @@ class ParallelMediationModel(object):
         mod_values = [i for i in product(*self._moderators_values)]
         mod_symb = self._moderators_symb
 
-        n_combs = len(mod_values)
-        effects, se, llci, ulci = np.empty((4, self._n_meds, n_combs))
+        n_cond_effects = len(mod_values)
+        effects, se, llci, ulci = np.empty((4, self._n_meds, n_cond_effects))
 
         for i in range(self._n_meds):
             effects[i], _, se[i], llci[i], ulci[i] = self._get_conditional_indirect_effects(i, mod_symb, mod_values)
 
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
-
 
     def _MM_index(self):
         """
@@ -445,15 +441,15 @@ class ParallelMediationModel(object):
         n_boots = self._options["boot"]
         (mod,) = self._moderators_symb  # Only one moderator
 
-        dict_baseline = dict([[mod, 0]])
+        dict_baseline = dict([[mod, 0]]) # Only moderator at 0
         e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_effect = dict([[mod, 1]])
+        dict_effect = dict([[mod, 1]]) # Only moderator at 1
         e_effect, be_effect = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
         effects, se, llci, ulci = np.empty((4, self._n_meds))
 
-        for i in range(self._n_meds):
+        for i in range(self._n_meds): #... For all the mediators
             e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
             e_effect[i], be_effect[i], *_ = self._indirect_effect_at(i, dict_effect)
 
@@ -500,24 +496,23 @@ class ParallelMediationModel(object):
             e_mod1[i], be_mod1[i], *_ = self._indirect_effect_at(i, dict_mod1)
             e_mod2[i], be_mod2[i], *_ = self._indirect_effect_at(i, dict_mod2)
 
-            e_pmm1 = e_mod1[i] - e_baseline[i]  # Moderator1 at 1 vs. Moderator1 at 0
-            e_pmm2 = e_mod2[i] - e_baseline[i]  # Moderator2 at 1 vs. Moderator2 at 0
+            e_pmm1 = e_mod1[i] - e_baseline[i]  # Effect of Moderator1 at 1 vs. Moderator1 at 0
+            e_pmm2 = e_mod2[i] - e_baseline[i]  # Effect of Moderator2 at 1 vs. Moderator2 at 0
 
-            be_pmm1 = be_mod1[i] - be_baseline[i]
+            be_pmm1 = be_mod1[i] - be_baseline[i] # Bootstrapped effects of...
             be_pmm2 = be_mod2[i] - be_baseline[i]
 
-            effects[0][i] = e_pmm1
+            effects[0][i] = e_pmm1 # PMM of first moderator
             se[0][i] = be_pmm1.std(ddof=1)
+
+            effects[1][i] = e_pmm2 # PMM of second moderator
+            se[1][i] = be_pmm2.std(ddof=1)
+
             if self._options["percent"]:
                 llci[0][i], ulci[0][i] = percentile_ci(be_pmm1, conf)
-            else:
-                llci[0][i], ulci[0][i] = bias_corrected_ci(e_pmm1, be_pmm1, conf)
-
-            effects[1][i] = e_pmm2
-            se[1][i] = be_pmm2.std(ddof=1)
-            if self._options["percent"]:
                 llci[1][i], ulci[1][i] = percentile_ci(be_pmm2, conf)
             else:
+                llci[0][i], ulci[0][i] = bias_corrected_ci(e_pmm1, be_pmm1, conf)
                 llci[1][i], ulci[1][i] = bias_corrected_ci(e_pmm2, be_pmm2, conf)
 
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
@@ -526,6 +521,10 @@ class ParallelMediationModel(object):
 
     def _MMM_index(self):
         """
+        The Moderated Moderated Mediation (MMM) index is only computed when exactly two moderators are present on the
+        mediation path.
+        It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
+        moderator on the indirect effect) on the marginal impact of the other moderator.
         """
         if "MMM" not in self._analysis_list:
             raise ValueError("This model does not report the Index for Moderated Moderated Mediation.")
@@ -534,37 +533,66 @@ class ParallelMediationModel(object):
         n_boots = self._options["boot"]
         mod1, mod2 = self._moderators_symb  # Only two moderators
 
-        dict_baseline = dict([[mod1, 1], [mod2, 1]])
-        e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        dict_both_on = dict([[mod1, 1], [mod2, 1]]) # Both moderators are on
+        e_both_on, be_both_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_mod1 = dict([[mod1, 2], [mod2, 0]])
-        e_mod1, be_mod1 = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        dict_mod1_on = dict([[mod1, 2], [mod2, 0]]) # Only the first moderator is on
+        e_mod1_on, be_mod1_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_mod2 = dict([[mod1, 0], [mod2, 2]])
-        e_mod2, be_mod2 = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        dict_mod2_on = dict([[mod1, 0], [mod2, 2]]) # Only the second moderator is on
+        e_mod2_on, be_mod2_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
         effects, se, llci, ulci = np.empty((4, 1, self._n_meds))
         for i in range(self._n_meds):
-            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
-            e_mod1[i], be_mod1[i], *_ = self._indirect_effect_at(i, dict_mod1)
-            e_mod2[i], be_mod2[i], *_ = self._indirect_effect_at(i, dict_mod2)
+            e_both_on[i], be_both_on[i], *_ = self._indirect_effect_at(i, dict_both_on)
+            e_mod1_on[i], be_mod1_on[i], *_ = self._indirect_effect_at(i, dict_mod1_on)
+            e_mod2_on[i], be_mod2_on[i], *_ = self._indirect_effect_at(i, dict_mod2_on)
 
-            e_pmm = e_baseline[i] - (e_mod1[i] + e_mod2[i]) / 2
+            e_mmm = e_both_on[i] - (e_mod1_on[i] + e_mod2_on[i]) / 2
+            be_mmm = be_both_on[i] - (be_mod1_on[i] + be_mod1_on[i]) / 2
 
-            be_pmm = be_mod1[i] - be_baseline[i]
-
-            effects[0][i] = e_pmm
-            se[0][i] = be_pmm.std(ddof=1)
+            effects[0][i] = e_mmm
+            se[0][i] = be_mmm.std(ddof=1)
             if self._options["percent"]:
-                llci[0][i], ulci[0][i] = percentile_ci(be_pmm, conf)
+                llci[0][i], ulci[0][i] = percentile_ci(be_mmm, conf)
             else:
-                llci[0][i], ulci[0][i] = bias_corrected_ci(e_pmm, be_pmm, conf)
+                llci[0][i], ulci[0][i] = bias_corrected_ci(e_mmm, be_mmm, conf)
 
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
 
+    def _floodlight_analysis(self, med_index, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5):
+        """
+        Conduct a floodlight analysis of the indirect effect for a specific mediator.
+        Search the critical values of mod_symb, at specific value(s) mod_dict of the other moderators.
+        :param med_index: int
+            The index of the mediator for which to conduct the spotlight analysis.
+        :param mod_symb: str
+            The symbol of the moderator
+        :param modval_range: list of float
+            The minimum and maximum values of the moderator.
+        :param other_modval_symb: dict
+            A mod_symb:mod_value dictionary of values for the other moderators of the direct path.
+        """
+
+        def spotlight_wrapper(f, med_index):
+            def wrapped(dict_modval):
+                b, be, se, llci, ulci = f(med_index, dict_modval)
+                return b, se, llci, ulci
+            return wrapped
+        spotlight_func = spotlight_wrapper(self._indirect_effect_at, med_index)
+        modval_min, modval_max = modval_range
+        sig_region = find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, other_modval_symb,
+                                              atol=atol, rtol=rtol)
+        return sig_region
+
+
     def _CMM_index(self):
         """
+        The Conditional Moderated Mediation (CMM) index is only computed when exactly two moderators are present on the
+        mediation path.
+        It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
+        moderator on the indirect effect) at various levels of the other moderator.
         """
         if "CMM" not in self._analysis_list:
             raise ValueError("This model does not report the Index for Conditional Moderated Mediation.")
@@ -761,23 +789,29 @@ class ParallelMediationModel(object):
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
         return df.apply(pd.to_numeric, args=["ignore"])
 
+    def MM_index_summary(self):
+        if "MMM" in self._analysis_list:
+            return self._MM_index_wrapper()
+        else:
+            raise NotImplementedError("This model does not report the Moderated Mediation index.")
+
     def MMM_index_summary(self):
         if "MMM" in self._analysis_list:
             return self._MMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not reported the Moderated Moderated Mediation index.")
+            raise NotImplementedError("This model does not report the Moderated Moderated Mediation index.")
 
     def PMM_index_summary(self):
         if "PMM" in self._analysis_list:
             return self._PMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not reported the Partial Moderated Mediation index.")
+            raise NotImplementedError("This model does not report the Partial Moderated Mediation index.")
 
     def CMM_index_summary(self):
         if "CMM" in self._analysis_list:
             return self._CMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not reported the Conditional Moderated Mediation index.")
+            raise NotImplementedError("This model does not report the Conditional Moderated Mediation index.")
 
     def coeff_summary(self):
         """
@@ -785,7 +819,6 @@ class ParallelMediationModel(object):
         :return: The appropriate moderated/unmoderated effect(s).
         """
         return self._cond_ind_effects_wrapper() if self._has_moderation else self._simple_ind_effects_wrapper()
-
 
     def summary(self):
         """
@@ -959,8 +992,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
             vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
         elif errortype == 'HC1':
             sq_resid = (resid ** 2).squeeze()
-            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * \
-                  dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
+            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
         elif errortype == 'HC2':
             sq_resid = (resid ** 2).squeeze()
             H = (x.dot(inv_xx) * x).sum(axis=-1)
@@ -982,7 +1014,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
         R2 = 1 - resid.var() / y.var()
         adjR2 = 1 - (1 - R2) * ((n_obs - 1) / (n_obs - n_vars - 1))
         F = (R2 / df_r) / ((1 - R2) / df_e)
-        F_pval = 1 - stats.f._cdf(F, df_r, df_e)
+        F_pval = 1 - stats.f.cdf(F, df_r, df_e)
         llci = betas - (se * zscore)
         ulci = betas + (se * zscore)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
@@ -1011,8 +1043,8 @@ class OLSOutcomeModel(BaseOutcomeModel):
         :return: A DataFrame of model statistics
         """
         results = self.estimation_results
-        stats = ["R2", "adjR2", "mse", "F", "df_r", "df_e", "F_pval"]
-        row = [[results[s] for s in stats]]
+        statistics = ["R2", "adjR2", "mse", "F", "df_r", "df_e", "F_pval"]
+        row = [[results[s] for s in statistics]]
         df = pd.DataFrame(row, index=[""], columns=["R²", "Adj. R²", "MSE", "F", "df1", "df2", "p-value"])
         return df
 
@@ -1197,6 +1229,23 @@ class DirectEffectModel(object):
             betas[i], se[i], llci[i], ulci[i] = self._direct_effect_at(mod_dict)
         return betas, se, llci, ulci
 
+    def _floodlight_analysis(self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5):
+        """
+        Conduct a floodlight analysis of the direct effect. Search the critical values of mod_symb,
+        at specific value(s) mod_dict of the other moderators.
+        :param mod_symb: str
+            The symbol of the moderator
+        :param modval_range: list of float
+            The minimum and maximum values of the moderator.
+        :param other_modval_symb: dict
+            A mod_symb:mod_value dictionary of values for the other moderators of the direct path.
+        """
+        modval_min, modval_max = modval_range
+        sig_region = find_significance_region(self._direct_effect_at, mod_symb, modval_min, modval_max,
+                                              other_modval_symb, atol=atol, rtol=rtol)
+        return sig_region
+
+
     def _direct_effect_at(self, mod_dict):
         """
         Compute the direct effect at specific value(s) of the moderator(s)
@@ -1275,3 +1324,107 @@ class DirectEffectModel(object):
 
     def __str__(self):
         return self.summary()
+
+
+class BaseFloodlightAnalysis:
+
+    def __init__(self, med_name, mod_name, sig_regions, modval_range, other_modval_name, precision):
+        """
+        A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
+        :param mod_name: string
+            The name of the moderator.
+        :param sig_regions: list of two lists
+            The regions of significance found for the moderator
+        :param modval_range: list
+            The range of the moderator mod_name.
+        :param other_modval_name: dict
+            A dictionnary of the values taken by the other moderators.
+        :param precision: int
+            The decimal precision at which to display the results.
+        """
+        if med_name is None:
+            self._path = "direct"
+        else:
+            self._path = "indirect"
+            self.med_name = med_name
+        self.mod_name = mod_name
+        self.sig_regions = sig_regions
+        self.modval_range = modval_range
+        self.other_modval_name = other_modval_name
+        self.precision = precision
+
+    def __repr__(self):
+        mod_name = self.mod_name
+        modval_min, modval_max = self.modval_range
+        prec_format = self.precision
+        other_modval_name = self.other_modval_name
+        sig_regions = self.sig_regions
+        effect_label = self._path
+
+        if effect_label == "direct":
+            ret_str = """*********************** FLOODLIGHT ANALYSIS OF THE DIRECT EFFECT ***********************\n"""
+        else:
+            ret_str = """********************** FLOODLIGHT ANALYSIS OF THE INDIRECT EFFECT **********************\n"""
+        ret_str += "\n----------------------------------- Analysis Details -----------------------------------\n\n"
+        if effect_label == "indirect":
+            ret_str += f"Mediator:\n    {self.med_name}\n\n"
+        ret_str += f"Focal Moderator:\n    {mod_name}, Range = [{modval_min:.{prec_format}}, {modval_max:.{prec_format}}]\n\n"
+
+        if other_modval_name:
+            ret_str += "Spotlight value for other moderators:\n"
+            for k, v in other_modval_name.items():
+                if isinstance(v, int):
+                    ret_str += f"    {k} = {v}\n"
+                else:
+                    ret_str += f"    {k} = {v:.{prec_format}}\n"
+
+        ret_str += "\n----------------------------------- Analysis Results -----------------------------------\n\n"
+
+        if sig_regions == [[], []]:
+            ret_str += f"The {effect_label} effect is never significant on the range."
+        else:
+            if sig_regions[0] != []:
+                lb, ub = sig_regions[0]
+                ret_str += f"The {effect_label} effect is significantly negative on the interval [{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
+            if sig_regions[1] != []:
+                lb, ub = sig_regions[1]
+                ret_str += f"The {effect_label} effect is significantly positive on the interval [{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
+        ret_str += """\n\n****************************************************************************************\n"""
+        return ret_str
+
+    def get_significance_regions(self):
+        return {"Negative on": self.sig_regions[0], "Positive on": self.sig_regions[1]}
+
+class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
+    def __init__(self, mod_name, sig_regions, modval_range, other_modval_name, precision):
+        """
+        A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
+        :param mod_name: string
+            The name of the moderator.
+        :param sig_regions: list of two lists
+            The regions of significance found for the moderator
+        :param modval_range: list
+            The range of the moderator mod_name.
+        :param other_modval_name: dict
+            A dictionnary of the values taken by the other moderators.
+        :param precision: int
+            The decimal precision at which to display the results.
+        """
+        super().__init__(None, mod_name, sig_regions, modval_range, other_modval_name, precision)
+
+class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
+    def __init__(self, med_name, mod_name, sig_regions, modval_range, other_modval_name, precision):
+        """
+        A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
+        :param mod_name: string
+            The name of the moderator.
+        :param sig_regions: list of two lists
+            The regions of significance found for the moderator
+        :param modval_range: list
+            The range of the moderator mod_name.
+        :param other_modval_name: dict
+            A dictionnary of the values taken by the other moderators.
+        :param precision: int
+            The decimal precision at which to display the results.
+        """
+        super().__init__(med_name, mod_name, sig_regions, modval_range, other_modval_name, precision)

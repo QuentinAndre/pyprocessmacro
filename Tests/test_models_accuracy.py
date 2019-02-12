@@ -51,8 +51,8 @@ def get_ols_accuracy(model_num):
         kwargs["m"] = "m"
 
     process = Process(data, model_num,precision=4, conf=95, modval={},
-                      quantile=0, logit=0, seed=123456, suppr_init=True,
-                      total=1, **kwargs)
+                      quantile=False, logit=False, seed=123456, suppr_init=True,
+                      total=True, **kwargs)
 
     dir = process.direct_model
     indir = process.indirect_model
@@ -100,8 +100,8 @@ def get_logit_accuracy(model_num):
 
 
     process = Process(data, model_num, precision=4, conf=95, modval={},
-                      quantile=0, logit=1, seed=123456,
-                      total=1, suppr_init=True, **kwargs)
+                      quantile=False, logit=True, seed=123456,
+                      total=True, suppr_init=True, **kwargs)
 
     dir = process.direct_model
     indir = process.indirect_model

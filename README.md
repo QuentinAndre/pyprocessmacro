@@ -1,7 +1,7 @@
 PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 ===========================================================================
 
-# 1. Copyright Notice for the original Process Macro
+# Copyright Notice for the original Process Macro
 
 The Process Macro for SAS and SPSS, and its associated files, are copyrighted by Andrew F. Hayes. The original code
 must not be edited or modified, and must not be distributed outside of 
@@ -13,7 +13,7 @@ code, permission was generously granted by Andrew F. Hayes to distribute PyProce
  This permission is not an endorsement of PyProcessMacro: all potential errors, bugs and inaccuracies are my own, and
 Andrew F. Hayes was not involved in writing, reviewing, or debugging the code.
 
-# 2. Manifest
+# Manifest
 
 The Process Macro by Andrew F. Hayes has helped thousands of researchers in their analysis of moderation, mediation, and
 conditional processes. Unfortunately, Process was only available for proprietary softwares (SAS and SPSS), which means
@@ -23,7 +23,7 @@ Because of the growing popularity of Python in the scientific community, I decid
 Process Macro into an open-source library, that researchers will be able to use without relying on those proprietary
 softwaress. PyProcessMacro is released under a MIT license.
  
-# 3. Features
+# Features
 
 In the current version, PyProcessMacro replicates the following features from the original Process Macro v2.16:
   * All models (1 to 76), with the exception of Model 6 (serial mediation) are supported, and have been numerically
@@ -43,8 +43,9 @@ The following changes and improvements have been made from the original Process 
   * All mediation models support an infinite number of mediators (versus a maximum of 10 in Process).
   * Normal theory tests for the indirect effect(s) are not reported, as the bootstrapping approach is now widely
   accepted and in most cases more robust.
-  * Plotting capabilities: PyProcessMacro can generate the plot of direct and indirect effects at various levels
-  of the moderators. See the documentation for plot_indirect_effects() and plot_direct_effects().
+  * Plotting capabilities: PyProcessMacro can generate the plot of conditional direct and indirect effects at various 
+  levels of the moderators. See the documentation for plot_conditional_indirect_effects() and 
+  plot_conditional_direct_effects().
   * Fast estimation process: PyProcessMacro leverages the capabilities of NumPy to efficiently compute a large number
   of bootstrap estimates, and dramatically speed up the estimation of complex models.
   * Transparent bootstrapping: PyProcessMacro explicitely reports the number of bootstrap samples that have been 
@@ -58,8 +59,47 @@ In the current version, the following features have not yet been ported to PyPro
   * Some options (`normal`, `varorder`, ...). PyProcessMacro will issue a warning to tell you if an option you are 
   trying to use is not implemented.
 
+# Version History
 
-# 4. Installation and Usage
+## Master Versions
+
+### 1.0.0 
+**Added support for floodlight analysis (Johnson-Neyman region of significance).**
+
+The methods `floodlight_direct_effect()` and `floodlight_indirect_effect()` can now be used to find the range of values
+at which an effect is significant. See the documentation for more information on those methods.
+
+**Added methods: `spotlight_direct_effect()` and `spotlight_direct_effect()`.**
+
+Those methods can be used to compute the conditional (in)direct effects of the models at various levels of the 
+moderators. 
+
+**Deprecation of `plot_direct_effects()` and `plot_indirect_effects()`.**
+
+Those methods have been deprecated in favor of `plot_conditional_direct_effects()` and 
+`plot_conditional_indirect_effects()` respectively. 
+
+The signature of the function has also changed: the argument `mods_at` has been renamed `modval` for consistency with
+other functions. Under the hood, those functions are faster and are using the newly introduced 
+`spotlight_direct_effect()` and `spotlight_direct_effect()` methods.
+
+## Beta versions
+
+### 0.9.6 -> 0.9.7
+
+* Added support for Moderation Mediation Index in single moderator models.
+* Performance improvements
+* Dependency updates
+* Added tests
+
+### 0.9.1 -> 0.9.5
+* Various bugfixes 
+* Performance improvements
+
+### 0.9.0
+First beta release.
+
+# Installation and Documentation
 
 This section will familiarize you with the few differences that exist between Process and PyProcessMacro.
 
@@ -67,7 +107,9 @@ You can install PyProcessMacro with pip:
 
     pip install pyprocessmacro
 
-## A. Minimal example
+## 1. Initializing a Process object
+
+### A. Minimal example
 
 The basic syntax for PyProcessMacro is the following:
 
@@ -93,7 +135,7 @@ Once the object is initialized, you can call its `summary()` method to display t
 You might have noticed that there is no argument `varlist` in PyProcessMacro. This is because the list of variables 
 is automatically inferred from the variable names given to x, y, m.
 
-## B. Adding statistical controls
+### B. Adding statistical controls
 
 In Process, the controls are defined as "any argument in the varlist that is not the IV, the DV, a moderator, or 
 a mediator." In PyProcessMacro, the list of variables to include as controls have to be explicitely specified in 
@@ -114,7 +156,7 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 p.summary()
 ````
 
-## C. Logistic regression for binary outcomes
+### C. Logistic regression for binary outcomes
 
 The original Process Macro automatically uses a Logistic (instead of OLS) regression when it detects a binary outcome.
  
@@ -129,7 +171,7 @@ p.summary()
 
 It goes without saying that this will return an error if your DV is not dichotomous.
 
-## D. Specifying custom spotlight values for the moderator(s)
+### D. Specifying custom spotlight values for the moderator(s)
 
 In Process as in PyProcessMacro the spotlight values of the moderators are defined as follow:
 * By default, the spotlight values are equal to M - 1SD, M and M + 1SD, where M and SD are the mean and standard 
@@ -153,8 +195,7 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 p.summary()
 ````
 
-
-## E. Suppress the initialization information
+### E. Suppress the initialization information
 
 When the Process object is initialized by Python, it displays various information about the model (model number, list of
  variables, sample size, number of bootstrap samples, etc...). If you wish not to display this information, just add the
@@ -166,12 +207,12 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 p.summary()
 ````
 
-# 4. Accessing the estimation results
+## 2. Accessing the estimation results
 
 After the `Process` object is initialized, you are not limited to printing the summary. PyProcessMacro implements the
 following methods that allow you to conveniently recover the different estimates of interest:
 
-## A. `summary()`
+### A. `summary()`
 
 This method replicates the output that you would see in Process, and displays the following information:
 * Model summaries and parameters estimates for all outcomes (i.e. the independent variable, and the mediator(s)).
@@ -181,7 +222,7 @@ This method replicates the output that you would see in Process, and displays th
 * If those statistics are relevant, indices for partial, conditional, and moderated moderated mediation will be 
 reported.
 
-## B. `outcome_models`
+### B. `outcome_models`
 
 This command gives you individual access to each of the outcome models through a dictionary. This allows you to recover 
 the model and parameters estimates for each outcome.
@@ -210,7 +251,7 @@ med1_R2 = model_medskills.estimation_results["R2"] # Store the R² of the model 
 Note that the methods are called from the `model_medskills` object! If you call `p.coeff_summary()`, 
 you will get an error.
 
-## C. `direct_model`
+### C. `direct_model`
 
 When the Process model includes a mediation, the direct effect model can conveniently be accessed, which 
 gives you access to the following methods: 
@@ -232,7 +273,7 @@ Note that the methods are called from the `direct_model` object! If you call `p.
 error.
 
 
-## D. `indirect_model`
+### D. `indirect_model`
 
 When the Process model includes a parallel mediation, the indirect effect model can be accessed as well, which 
 gives you access to the following methods: 
@@ -260,7 +301,56 @@ df_params_direct = indirect_model.coeff_summary() # Store the DataFrame of estim
 Note that the methods are called from the `indirect_model` object! If you call `p.coeff_summary()`, you will get an 
 error.
 
-# 5. Bootstrap samples estimates
+
+## 3. Spotlight and Floodlight Analysis 
+
+### A. Compute direct/indirect effects for specific values (spotlight analysis)
+
+If you wish to display the conditional effects at other values of the moderator(s), you do not have to re-instantiate 
+the model from scratch, and can instead use the `spotlight_direct_effect()` and 
+`spotlight_indirect_effect()` methods.
+
+````python
+df_direct_effects = p.spotlight_direct_effect(modval={
+                                    "Motivation":[-1, 0, 1], # Moderator 'Motivation' at values -1, 0 and 1
+                                    "SkillRelevance":[-5, 5] # Moderator 'SkillRelevance' at values -1 and 1
+            })
+
+df_indirect_effects = p.spotlight_indirect_effect(med_name="MediationSkills", modval={
+                                    "Motivation":[-1, 0, 1], # Moderator 'Motivation' at values -1, 0 and 1
+                                    "SkillRelevance":[-5, 5] # Moderator 'SkillRelevance' at values -1 and 1
+            })
+````
+
+### B. Find the values of a moderator for which the direct/indirect effect are significant (floodlight analysis)
+
+Instead of checking the direct and indirect effects at specific values, you might be interested in identifying under
+which level of a moderator the effect becomes significant. 
+
+````python
+floodlight_motiv_direct= p.floodlight_direct_effect(mod_name="Motivation")
+floodlight_motiv_indirect = p.spotlight_indirect_effect(med_name="MediationSkills", mod_name="Motivation")
+````
+
+Calling `floodlight_motiv_direct` or `floodlight_motiv_indirect` will print out a detailed summary of the region(s) of 
+significance. Alternatively, you can call `floodlight_motiv_direct.get_significance_regions()` to get the regions of
+positive/negative significance in a dictionary.
+
+The floodlight analysis can only be conducted on one moderator at a time. When multiple moderators are present on the
+direct/indirect path, the floodlight analysis assumes the value of those other moderators to be zero. However, you can
+change this behavior by specifying a custom level for the other moderators:
+
+````python
+floodlight_motiv_direct= p.floodlight_direct_effect(mod_name="Motivation", other_modval={"SkillRelevance": 1})
+floodlight_motiv_indirect = p.spotlight_indirect_effect(med_name="MediationSkills", mod_name="Motivation",
+                                                        other_modval={"SkillRelevance": 1})
+````
+
+Here, pyprocessmacro will conduct a floodlight analysis on the effect of MediationSkills when the level of 
+SkillRelevance is set to 1. This is, in essence, a spotlight-floodlight analysis ;).
+
+
+## 4. Recover bootstrap samples estimates
 
 The original Process macro allows you to save the parameter estimates for each bootstrap sample by specifying the `save`
 keyword. The Macro then returns a new dataset of bootstrap estimates.
@@ -275,15 +365,15 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 boot_estimates = p.get_bootstrap_estimates() # Called from the Process object directly.
 ````
 
-# 6. Plotting capabilities
+## 5. Plotting capabilities
 
 PyProcessMacro allows you to plot the conditional direct and indirect effect(s), at different values of the moderators.
 
-The methods `plot_indirect_effects()` and `plot_direct_effects()` are identical in syntax, with one
-small exception: you must specify the name of the mediator for `plot_indirect_effects` as a first argument. They return
-a `seaborn.FacetGrid` object that can be used to further tweak the appearance of the plot.
+The methods `plot_conditional_indirect_effects()` and `plot_conditional_direct_effects()` are identical in syntax, 
+with one small exception: you must specify the name of the mediator for `plot_indirect_effects` as a first argument. 
+They return a `seaborn.FacetGrid` object that can be used to further tweak the appearance of the plot.
 
-## A. Basic Usage 
+### A. Basic Usage 
 
 When plotting conditional direct (and indirect) effects, the effect is always represented on the y-axis. 
 
@@ -331,21 +421,21 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", row="Ski
 plt.show()
 ````
 ![RowCodedModerator](Images/Ex4.png)
-## B. Change the spotlight values
+### B. Change the spotlight values
 
 By default, the spotlight values used to plot the effects are the same as the ones passed when initializing Process.
-However, you can pass custom values for some, or all, the moderators through the `mods_at` argument.
+However, you can pass custom values for some, or all, the moderators through the `modval` argument.
 
 ````python
 # Change the spotlight values for SkillRelevance
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance", 
-                            mods_at={"SkillRelevance": [-5, 5]})
+                            modval={"SkillRelevance": [-5, 5]})
 g.add_legend(title="")
 plt.show()
 ````
 ![ChangeSpotValues](Images/Ex6.png)
 
-## C. Representation of uncertainty
+### C. Representation of uncertainty
 
 The display of confidence intervals for the direct/indirect effects can be customized through the `errstyle` argument:
 * `errstyle="band"` (default) plots a continuous error band between the lower and higher confidence interval. This 
@@ -358,7 +448,7 @@ visualize the error at all levels of the moderator.
  ````python
 # CI for dichotomous moderator
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance", 
-                            mods_at={"Motivation": [0, 1], "SkillRelevance":[-1, 0, 1]},
+                            modval={"Motivation": [0, 1], "SkillRelevance":[-1, 0, 1]},
                             errstyle="ci")
 ````
 ![ErrStyleCI](Images/Ex7.png)
@@ -366,14 +456,14 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
 ````python                
 # Error band for continous moderator
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance", 
-                            mods_at={"SkillRelevance":[-1, 0, 1]},
+                            modval={"SkillRelevance":[-1, 0, 1]},
                             errstyle="ci")
 ````
 ![ErrStyleBand](Images/Ex8.png)
 ````python
 # No representation of error
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance", 
-                            mods_at={"SkillRelevance":[-1, 0, 1]},
+                            modval={"SkillRelevance":[-1, 0, 1]},
                             errstyle="none")
                             
 plt.show()
@@ -381,13 +471,14 @@ plt.show()
 ![ErrStyleNone](Images/Ex9.png)
 
 
-## D. "Partial" plots
+### D. "Partial" plots
 
 So far, the number of moderators supplied as arguments to the plot function was always equal to the number of moderators
 on the path of interest (1 for the direct path, 2 for the indirect path).
 
 You can also "omit" some moderators, and plot "partial" conditional direct/indirect effects. In that case, the omitted 
-moderators  will assume a value of 0 when computing the direct/indirect effects.
+moderators  will assume a value of 0 when computing the direct/indirect effects. To make sure that this is intentional,
+pyprocessmacro will warn you when this happens.
 
 ````python
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
@@ -401,18 +492,18 @@ plt.show() # This plot represents the "partial" conditional indirect effect, whe
 
 
 If you want the omitted moderator(s) to have a different value than 0, you must pass a unique value for each moderator
-as a key in the `mods_at` dictionary:
+as a key in the `modval` dictionary:
 
 ````python
-g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", mods_at={"SkillRelevance":[-5]}) 
+g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", modval={"SkillRelevance":[-5]}) 
 plt.show() # This plot represents the "partial" conditional indirect effect, when SkillRelevance is evaluated at -5.
 ````
 ![PartialPlotCustom](Images/Ex11.png)
 
-Do not pass multiple values in `mods_at` if you do not intend to represent this moderator on the plot, as the graph
-will then not be interpretable!
+If you pass multiple values in `modval` for a moderator that is not displayed of the graph, the method will 
+return an error.
 
-# E. Customize the appearance of the plots
+### E. Customize the appearance of the plots
 
 Under the hood, the plotting functions relies on a `seaborn.FacetGrid` object, on which the following objects 
 are plotted:
