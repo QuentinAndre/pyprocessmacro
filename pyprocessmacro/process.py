@@ -1,14 +1,13 @@
+# -*- coding: utf-8 -*-
+import copy
+import warnings
+from itertools import product
+
 import pandas as pd
 import numpy as np
-import copy
 from .models import OLSOutcomeModel, DirectEffectModel, ParallelMediationModel, LogitOutcomeModel, \
     DirectFloodlightAnalysis, IndirectFloodlightAnalysis
-from itertools import product
-from seaborn import FacetGrid
-import matplotlib.pyplot as plt
-from .utils import plot_errorbands, plot_errorbars
-import warnings
-import re
+from .utils import plot_conditional_effects, gen_moderators
 
 warnings.simplefilter("default")
 
@@ -256,30 +255,30 @@ class Process(object):
              'x_to_m': ["x", "w", "z", "x*z", "x*w"]}
     }
 
-    def __init__(self, data: pd.DataFrame = None,
-                 model: int = None,
-                 modval: dict = None,
-                 cluster: str = None,
-                 boot: int = 5000,
-                 seed: int = 12345,
-                 mc: bool = None,
-                 conf: int = 95,
-                 effsize: bool = False,
-                 jn: bool = False,
-                 hc3: bool = False,
-                 controls: list = None,
-                 controls_in: str = "all",
-                 total: bool = False,
-                 contrast: bool = False,
-                 center: bool = False,
-                 quantile: bool = False,
-                 detail: bool = True,
-                 percent: bool = False,
-                 logit: bool = False,
-                 iterate: int = 10000,
-                 convergence: float = 0.00000001,
-                 precision: int = 4,
-                 suppr_init: bool = False,
+    def __init__(self, data,
+                 model=3,
+                 modval=None,
+                 cluster=None,
+                 boot=5000,
+                 seed=12345,
+                 mc=None,
+                 conf=95,
+                 effsize=False,
+                 jn=False,
+                 hc3=False,
+                 controls=None,
+                 controls_in="all",
+                 total=False,
+                 contrast=False,
+                 center=False,
+                 quantile=False,
+                 detail=True,
+                 percent=False,
+                 logit=False,
+                 iterate=10000,
+                 convergence=0.00000001,
+                 precision=4,
+                 suppr_init=False,
                  **kwargs):
         """
         Initialize a Process model, as defined in Andrew F. Hayes's book 'Introduction to Mediation, Moderation,
@@ -388,20 +387,19 @@ class Process(object):
         self.controls = controls
         self.data = data
         arguments = locals()
-        self._var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
-
-        self._raw_equations = copy.deepcopy(self.__models_eqs__[model])  # Avoid any accidental modification
-        self._raw_varlist = copy.deepcopy(self.__models_vars__[model])
 
         # Validate the arguments supplied as options
-        self.options = {k: arguments.get(k) for k in self.__options_kws__}
-        self._validate_options()
+        self.options = self._gen_valid_options(arguments)
 
         # Check the congruence between the model specifications, the model number, and the data, and store the final
         # list of variables used
-        self.varlist = self._validate_varlist_model()
-        self.mediators = self._var_kwargs.get("m")
-        self.iv = self._var_kwargs.get("y")[0]  # TODO: Ugly, change this
+        var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
+
+        self.mediators = var_kwargs.get("m")
+        self.iv = var_kwargs.get("y")[0]  # TODO: Ugly, change this
+
+        self.varlist = self._gen_valid_varlist(var_kwargs)
+
         # Check the number of mediators supplied to the model:
         if self.model_num > 3:
             self.n_meds = len(self.mediators)
@@ -411,62 +409,35 @@ class Process(object):
             self.has_mediation = False
 
         # Creating the dictionary mapping each variable to its symbol (y, x, m, w, ...)
-        self._var_to_symb, self._symb_to_var = self._gen_var_mapping()
-
-        # Renaming the dictionary of custom spotlight values
-        modval_symb = {self._var_to_symb.get(k): v for k, v in modval.items()}
+        self._var_to_symb, self._symb_to_var = self._gen_var_mapping(var_kwargs)
 
         # Identify the moderators of the different variables for the different paths
-        terms_y = self._raw_equations["all_to_y"]
-        terms_m = self._raw_equations["x_to_m"]
-        terms = terms_y + terms_m
-        # Moderators of X in the path to Y
-        x_mods_re = re.compile("^x\*([a-z])$")
-        mod_x_direct = set(filter(lambda v: f"x*{v}" in terms_y, self._raw_varlist))
+        raw_equations = copy.deepcopy(self.__models_eqs__[model])
+        raw_varlist = copy.deepcopy(self.__models_vars__[model])
 
-        # Moderators of X in the path to M
-        mod_x_indirect = set(filter(lambda v: f"x*{v}" in terms_m, self._raw_varlist))
-
-        # Moderators of M in the path to Y
-        mod_m = set([i for i in self._raw_varlist if f"m*{i}" in terms_y])
-        mod_m = set(filter(lambda v: f"m*{v}" in terms_y, self._raw_varlist))
-
-        self._moderators = {
-            "x_direct": mod_x_direct,
-            "x_indirect": mod_x_indirect,
-            "m": mod_m,
-            "all": mod_x_indirect | mod_x_direct | mod_m,
-            "indirect": mod_x_indirect | mod_m
-        }
-
-        self._centered_vars = None
-
-        # Prepare the data: drop NaN observations, rename the columns, add a constant.
-        n_obs_before = self.data.shape[0]
-        self.data = self._prepare_data()
-        self.n_obs = self.data.shape[0]
-        self.n_obs_null = n_obs_before - self.n_obs
-
-        # If appropriate, mean-center the variables used in products
-        if self.options["center"]:
-            self._mean_center_vars()
+        self.moderators = gen_moderators(raw_equations, raw_varlist)
 
         # Generating the equations used for estimation: a list of (exog, endog) tuples.
-        self._equations = self._gen_equations(controls_in=controls_in)
+        self._equations = self._gen_equations(raw_equations["all_to_y"], raw_equations["x_to_m"],
+                                              controls_in=controls_in)
 
-        # Adding the interactions terms to the data and equations.
-        self._add_interaction_columns()
+        # Prepare the data: drop NaN, rename the columns, add a constant, and mean-center moderators if needed.
+        self.data, self.n_obs, self.n_obs_null, self.centered_vars = self._prepare_data()
 
-        # Creating the dictionary mapping each variable to its column index in the data
+        # Now that the data is ready, create the dictionary mapping each variable to its column index.
         self._symb_to_ind = {v: i for i, v in enumerate(self.data.columns.values)}
 
         # Generate the statistical models that will be estimated
         self.outcome_models = self._gen_outcome_models()
 
-        self.spotlight_values = self._get_spotlight_values(modval_symb)
+        # Rename the dictionary of custom spotlight values, and generating the spotlight values.
+        modval_symb = {self._var_to_symb.get(k): v for k, v in modval.items()}
+        self.spotlight_values = self._gen_spotlight_values(modval_symb)
 
+        # Generate the direct model.
         self.direct_model = self._gen_direct_effect_model()
 
+        # Generate the indirect model (if there is one).
         if self.has_mediation:
             self.indirect_model = self._gen_indirect_effect_model()
         else:
@@ -476,12 +447,12 @@ class Process(object):
         if not suppr_init:
             self._print_init()
 
-    def _validate_options(self):
+    def _gen_valid_options(self, arguments):
         """
         Validate the arguments specified for the different options used in Process.
         :return:
         """
-        options = self.options
+        options = {k: arguments.get(k) for k in self.__options_kws__}
         errstr = ""
         conf = options["conf"]
         seed = options["seed"]
@@ -492,21 +463,21 @@ class Process(object):
             errstr += "The option 'seed' must be  an integer between 0 and 1 000 000 000, exclusive.\n"
 
         if options["contrast"] not in [True, False]:
-            errstr += "The option 'contrast' must be 0 or 1.\n"
+            errstr += "The option 'contrast' must be 'True' or 'False'.\n"
         if options["total"] not in [True, False]:
-            errstr += "The option 'total' must be 0 or 1.\n"
+            errstr += "The option 'total' must be 'True' or 'False'.\n"
         if options["jn"] not in [True, False]:
-            errstr += "The option 'jn' must be 0 or 1.\n"
+            errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["hc3"] not in [True, False]:
-            errstr += "The option 'hc3' must be 0 or 1.\n"
+            errstr += "The option 'hc3' must be 'True' or 'False'.\n"
         if options["center"] not in [True, False]:
-            errstr += "The option 'center' must be 0 or 1.\n"
+            errstr += "The option 'center' must be 'True' or 'False'.\n"
         if options["quantile"] not in [True, False]:
-            errstr += "The option 'jn' must be 0 or 1.\n"
+            errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["jn"] not in [True, False]:
-            errstr += "The option 'jn' must be 0 or 1.\n"
+            errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["logit"] not in [True, False]:
-            errstr += "The option 'logit' must be 0 or 1.\n"
+            errstr += "The option 'logit' must be 'True' or 'False'.\n"
         if options["controls_in"] not in ["all", "x_to_tm", "all_to_y"]:
             errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
@@ -519,14 +490,15 @@ class Process(object):
                     try:
                         [float(i) for i in v]
                     except (ValueError, TypeError):
-                        errstr += f"The value associated with {k} in the dictionary 'modval' is not a list of numbers.\n"
+                        errstr += f"The value of {k} in the dictionary 'modval' is not a list of numbers.\n"
 
         if errstr != "":
             raise ValueError(f"""Some errors were found in the options specified. Please correct the following error(s):
             {errstr}
             """)
+        return options
 
-    def _validate_varlist_model(self):
+    def _gen_valid_varlist(self, var_kwargs):
         """
         Validate the arguments and data supplied to the Process Model, by checking:
             1. That the arguments match the model specification
@@ -537,22 +509,22 @@ class Process(object):
             The list of variables used in Process.
         """
         # Check the number of variables supplied as argument, and convert them to lists if needed.
-        for k, v in self._var_kwargs.items():
+        for k, v in var_kwargs.items():
             if isinstance(v, str):
-                self._var_kwargs[k] = [v]
+                var_kwargs[k] = [v]
             if isinstance(v, list):
                 if ((k != "m") & (len(v) != 1)) or ((self.model_num <= 3) & (len(v) != 1)):
                     raise ValueError(f"Several variable names have been specified for '{k}'. \n"
                                      f"The Model {self.model_num} accepts only one variable for '{k}'"
                                      )
 
-        var_kwargs = set(self._var_kwargs.keys())
+        var_kwargs_set = set(var_kwargs.keys())
         expected_var_kwargs = self.__models_vars__[self.model_num]
 
         # Validate the Model specification.
-        if var_kwargs != expected_var_kwargs:
-            miss_vars = expected_var_kwargs - var_kwargs
-            exced_vars = var_kwargs - expected_var_kwargs
+        if var_kwargs_set != expected_var_kwargs:
+            miss_vars = expected_var_kwargs - var_kwargs_set
+            exced_vars = var_kwargs_set - expected_var_kwargs
             err_str = f"""The variables supplied do not match the definition of Model {self.model_num}
             """
             if miss_vars:
@@ -562,7 +534,7 @@ class Process(object):
             raise ValueError(err_str)
 
         var_kwargs_names = []
-        for _, v in self._var_kwargs.items():
+        for _, v in var_kwargs.items():
             var_kwargs_names.extend(v)
 
         varlist = list(set(self.controls) | set(var_kwargs_names))
@@ -573,78 +545,7 @@ class Process(object):
             DataFrame supplied. Please double check that '{", ".join(miss_var_names)}' is/are in the DataFrame.""")
         return varlist
 
-    def _get_analysis_list(self):
-        """
-        Process always report the indirect effect/conditional indirect effect(s).
-        If one moderator is present, Process will report the Moderated Mediation Index (MM).
-        If exactly two moderators are present, additional analysis could be reported: the
-        Conditional Moderated Mediation (CMM), the Moderated Moderated Mediation (MMM), and the
-        Partial Moderated Mediation (PMM). This function establishes which of those statistics should be reported:
-          1. If the two moderators are on two different paths (X to M, or M to Y): both CMM and MMM are reported.
-          2. If the two moderators are on the same path and form a 3-way interaction: both CMM and MMM are reported.
-          3. If the two moderators are on the same path and do not form a 3-way: the PMM is reported.
-          4. If at least one of the two moderators is present on both paths: no analysis is reported.
-
-        This function returns the list of additional analysis to report. If no additional analysis must be performed,
-         this list is empty.
-        :return: list
-            ["MM"], ["MMM", "CMM"], ["PMM"] or []
-        """
-        n_mods_x = len(self._moderators["x_indirect"])
-        n_mods_m = len(self._moderators["m"])
-        n_mods = n_mods_m + n_mods_x
-        y_exogvars = self._equations[0][1]
-        m_exogvars = self._equations[1][1]
-
-        if n_mods == 0:  # No moderators, so no additional analysis.
-            return []
-
-        terms = y_exogvars + m_exogvars
-        threeway = any(
-            [1 if len(term.split("*")) == 3 else 0 for term in terms])  # Find if there is any three-way interaction
-
-        if n_mods == 1:
-            return ["MM"]
-        elif n_mods == 2:
-            if (n_mods_m == 1) or threeway:  # Moderators on two different paths
-                return ["MMM", "CMM"]
-            else:
-                return ["PMM"]
-        else:
-            return []
-
-    def _get_spotlight_values(self, modval):
-        """
-        Generate the spotlight values of the moderators.
-        The function first search the dictionary 'modval' for custom spotlight values.
-        If they cannot be found, it uses discrete values if the moderator is discrete.
-        If the moderator is not discrete, is uses quantiles or mean +/- 1SD, depending on the options specified
-        in the Process object.
-        :param modval: dict
-            A dictionary {'mod_name':[mod_values]} of custom spotlight values for the moderator(s)
-        :return: dict
-            A dictionary {'mod_name':[spot_values]} of spotlight values for all the moderator(s) of the model
-        """
-        spot_values = {}
-        data = self.data.values
-        for mod in self._moderators["all"]:
-            index = self._symb_to_ind[mod]
-            val = data[:, index]
-            spotvals = modval.get(mod, [])
-            if not spotvals:
-                if len(np.unique(val)) <= 5:
-                    spot_values[mod] = np.unique(val)
-                elif self.options["quantile"]:
-                    spot_values[mod] = np.percentile(val, [10, 25, 50, 75, 90])
-                else:
-                    m = val.mean()
-                    std = val.std(ddof=1)
-                    spot_values[mod] = [m - std, m, m + std]
-            else:
-                spot_values[mod] = spotvals
-        return spot_values
-
-    def _gen_var_mapping(self):
+    def _gen_var_mapping(self, var_kwargs):
         """
         Map each dependent variable, independent variable, moderator, and mediator supplied to the model
         to a unique symbol:
@@ -655,12 +556,10 @@ class Process(object):
         :return: tuple (var_to_symb, symb_to_var)
             The dictionaries mapping the variable name to their symbols, and vice versa
         """
-        var_to_symb = {}  # Map each variable name to its symbolic representation.
-        symb_to_var = {}
-        var_to_symb["Cons"] = "Cons"
-        symb_to_var["Cons"] = "Cons"
+        var_to_symb = {"Cons": "Cons"}  # Map each variable name to its symbolic representation.
+        symb_to_var = {"Cons": "Cons"}
 
-        for key, varnames in self._var_kwargs.items():
+        for key, varnames in var_kwargs.items():
             if (key == "m") & (self.model_num > 3):  # Variable m is a mediator
                 for i, v in enumerate(varnames):
                     symb_to_var[f"{key}{i + 1}"] = v
@@ -675,6 +574,75 @@ class Process(object):
 
         return var_to_symb, symb_to_var
 
+    def _gen_equations(self, all_to_y, x_to_m, controls_in="all"):
+        """
+        Generate a list of tuple (exogterm, endogterms) that define the equations to estimate the full path to Y
+        and the full path to the mediators (if relevant)
+            Model 1, 2, 3: No mediator, and therefore only one equation to estimate the full path to Y.
+                eqlist[0]: (y, full_path_to_y)
+            Model 6: Serial mediation. One equation to estimate the full path to Y, and N equations to estimate
+            each of the serial mediation paths.
+                eqlist[0] = (y, full_path_to_y)
+                eqlist[1:] = (Mi, full_path_to_Mi) for i in M1, M2, ... MN
+            Model 4, 5, and 7+: Parallel mediation. One equation to estimate the full path to Y, and N identical
+            equations to estimate each of the parralel mediators.
+                eqlist[0] = (y, full_path_to_y)
+                eqlist[1:] = (Mi, full_path_to_M) for i in M1, M2, ... MN
+        """
+
+        all_to_y_base = all_to_y.copy()
+        x_to_m_base = x_to_m.copy()
+
+        eqlist = []
+        control_vars = [v for v in self._symb_to_var.keys() if v[0] == 'c']
+
+        if controls_in == "all":
+            all_to_y_base += control_vars
+            x_to_m_base += control_vars
+        elif controls_in == "x_to_m":
+            x_to_m_base += control_vars
+        elif controls_in == "all_to_y":
+            all_to_y_base += control_vars
+
+        if self.model_num <= 3:  # No mediators, just the equation for Y to estimate.
+            eqlist.append(("y", ["Cons"] + all_to_y_base))
+            return eqlist
+
+        elif self.model_num != 6:  # Parallel mediators
+            all_to_y_full = ["Cons"] + [i for i in all_to_y_base if "m" not in i]
+            x_to_m_full = ["Cons"] + [i for i in x_to_m_base if "m" not in i]
+
+            # Substitute the individual mediation terms to the general term "m" in the equations
+            for i in range(self.n_meds):
+                for term in all_to_y_base:
+                    if "m" in term:
+                        all_to_y_full.append(term.replace("m", f"m{i + 1}"))
+                    else:
+                        pass
+
+            eqlist.append(("y", all_to_y_full))  # Full path to Y
+            eqlist += [(f"m{i + 1}", x_to_m_full) for i in range(self.n_meds)]  # Same equation for all mediators
+            return eqlist
+
+        else:  # Serial mediators are only found in model 6
+            eq_y_full = ["Cons"] + [i for i in all_to_y if "m" not in i]
+            eq_x_to_meds_basis = ["Cons"] + [i for i in x_to_m]
+
+            # Substitute the individual mediation terms to the general term "m" in the equations
+            for i in range(self.n_meds):
+                for term in all_to_y:
+                    if "m" in term:
+                        eq_y_full.append(term.replace("m", f"m{i + 1}"))
+                    else:
+                        pass
+
+            eqlist.append(("y", eq_y_full))  # Equation for Y
+            for i in range(self.n_meds):  # One equation per mediator
+                # Add the previous mediators as predictors
+                eq_x_to_med = eq_x_to_meds_basis + [f"m{i + 1}" for _ in range(i)]
+                eqlist.append((f"m{i + 1}", eq_x_to_med))
+        return eqlist
+
     def _prepare_data(self):
         """
         Subset the dataframe to the columns needed for estimation purposes, add a constant, and drop missing
@@ -683,7 +651,10 @@ class Process(object):
         """
         # Subset the data to the columns used in the model
         data = self.data[self.varlist].copy()
+        n_obs_before = self.data.shape[0]
         data = data.dropna().reset_index()
+        n_obs_after = self.data.shape[0]
+        n_obs_null = n_obs_before - n_obs_after
 
         # Map each variable name to a unique variable code, and rename the columns in the data.)
         data.rename(columns=self._var_to_symb, inplace=True)
@@ -701,113 +672,28 @@ class Process(object):
             else:
                 endog_logit = [0 if i == uniques[0] else 1 for i in endog]
             data["y"] = endog_logit
-        return data
 
-    def _mean_center_vars(self):
-        """
-        Mean-center the variables involved in interaction terms
-        :return: None
-        """
-        mod_m = self._moderators["m"]
-        mod_x = self._moderators["x_indirect"] | self._moderators["x_direct"]
-        cols = []
-        if mod_m:
-            cols += list(mod_m) + list({c for c in self.data.columns if "m" in c})
-        if mod_x:
-            cols += list(mod_x) + ["x"]
-        self.data[cols] = self.data[cols].subtract(self.data[cols].mean())
-        self._centered_vars = cols
+        centered_vars = []
+        if self.options["center"]:
+            mod_m = self.moderators["m"]
+            mod_x = self.moderators["x_indirect"] | self.moderators["x_direct"]
+            if mod_m:
+                centered_vars += list(mod_m) + list({c for c in data.columns if "m" in c})
+            if mod_x:
+                centered_vars += list(mod_x) + ["x"]
+            data.loc[:, centered_vars] = data.loc[:, centered_vars].subtract(data.loc[:, centered_vars].mean())
 
-    def _gen_equations(self, controls_in="all"):
-        """
-        Generate a list of tuple (exogterm, endogterms) that define the equations to estimate the full path to Y
-        and the full path to the mediators (if relevant)
-            Model 1, 2, 3: No mediator, and therefore only one equation to estimate the full path to Y.
-                eqlist[0]: (y, full_path_to_y)
-            Model 6: Serial mediation. One equation to estimate the full path to Y, and N equations to estimate
-            each of the serial mediation paths.
-                eqlist[0] = (y, full_path_to_y)
-                eqlist[1:] = (Mi, full_path_to_Mi) for i in M1, M2, ... MN
-            Model 4, 5, and 7+: Parallel mediation. One equation to estimate the full path to Y, and N identical
-            equations to estimate each of the parralel mediators.
-                eqlist[0] = (y, full_path_to_y)
-                eqlist[1:] = (Mi, full_path_to_M) for i in M1, M2, ... MN
-        """
-
-        all_to_y_base = self._raw_equations["all_to_y"]
-        x_to_m_base = self._raw_equations["x_to_m"]
-        eqs_dict = self._raw_equations
-        eqlist = []
-        control_vars = [v for v in self._symb_to_var.keys() if v[0] == 'c']
-
-        if controls_in == "all":
-            all_to_y_base += control_vars
-            x_to_m_base += control_vars
-        elif controls_in == "x_to_m":
-            x_to_m_base += control_vars
-        elif controls_in == "all_to_y":
-            all_to_y_base += control_vars
-
-        if self.model_num <= 3:  # No mediators, just the equation for Y to estimate.
-            eqlist.append(("y", ["Cons"] + all_to_y_base))
-        elif self.model_num != 6:  # Parallel mediators
-            all_to_y_full = ["Cons"] + [i for i in all_to_y_base if "m" not in i]
-            x_to_m_full = ["Cons"] + [i for i in x_to_m_base if "m" not in i]
-
-            # Substitute the individual mediation terms to the general term "m" in the equations
-            for i in range(self.n_meds):
-                for term in all_to_y_base:
-                    if "m" in term:
-                        all_to_y_full.append(term.replace("m", f"m{i + 1}"))
-                    else:
-                        pass
-
-            eqlist.append(("y", all_to_y_full))  # Full path to Y
-            eqlist += [(f"m{i + 1}", x_to_m_full) for i in range(self.n_meds)]  # Same equation for all mediators
-
-        else:  # Serial mediators are only found in model 6
-            eq_y_full = ["Cons"] + [i for i in eqs_dict["eq_y"] if "m" not in i]
-            eq_x_to_meds_basis = ["Cons"] + [i for i in eqs_dict["x_to_m"]]
-
-            # Substitute the individual mediation terms to the general term "m" in the equations
-            for i in range(self.n_meds):
-                for term in eqs_dict["all_to_y"]:
-                    if "m" in term:
-                        eq_y_full.append(term.replace("m", f"m{i + 1}"))
-                    else:
-                        pass
-
-            eqlist.append(("y", eq_y_full))  # Equation for Y
-            for i in range(self.n_meds):  # One equation per mediator
-                eq_x_to_med = eq_x_to_meds_basis + [f"m{i + 1}" for j in range(i)]
-                eqlist.append((f"m{i + 1}", eq_x_to_med))
-        return eqlist
-
-    def _add_interaction_columns(self):
-        """
-        Identify the interaction terms in the model's equations, and:
-            1. Generate the corresponding columns to the data
-            2. Add the corresponding keys to the mapping dictionaries
-        """
+        # Now we add the interaction columns
         eqs = self._equations
         intterms = [term for _, eq in eqs for term in eq if "*" in term]  # All interaction terms in all equations.
         for term in intterms:
             termlist = term.split("*")  # List of terms in interaction
-            self.data[term] = self.data[term.split("*")].product(axis=1)
+            data[term] = data.loc[:, termlist].product(axis=1)
             termname = "*".join([self._symb_to_var[i] for i in termlist])  # Full name of interaction
             self._var_to_symb[termname] = term
             self._symb_to_var[term] = termname
 
-    def _eq_to_indices(self, eq):
-        """
-        Convert an equation (i.e. a tuple of (endogterm, exog_terms_y) into a tuple of indices corresponding to the
-        position of the terms in the data.
-        """
-        c = self.data.columns.values
-        endogterm, exogterms = eq
-        endogind = np.where(c == endogterm)[0][0]
-        exoginds = np.concatenate([np.where(c == i)[0] for i in exogterms])
-        return endogind, exoginds
+        return data, n_obs_after, n_obs_null, centered_vars
 
     def _gen_outcome_models(self):
         """
@@ -841,9 +727,41 @@ class Process(object):
                 models[med_name] = model_m
         return models
 
+    def _gen_spotlight_values(self, modval):
+        """
+        Generate the spotlight values of the moderators.
+        The function first search the dictionary 'modval' for custom spotlight values.
+        If they cannot be found, it uses discrete values if the moderator is discrete.
+        If the moderator is not discrete, is uses quantiles or mean +/- 1SD, depending on the options specified
+        in the Process object.
+        :param modval: dict
+            A dictionary {'mod_name':[mod_values]} of custom spotlight values for the moderator(s)
+        :return: dict
+            A dictionary {'mod_name':[spot_values]} of spotlight values for all the moderator(s) of the model
+        """
+        spot_values = {}
+        data = self.data.values
+        for mod in self.moderators["all"]:
+            index = self._symb_to_ind[mod]
+            val = data[:, index]
+            spotvals = modval.get(mod, [])
+            if not spotvals:
+                if len(np.unique(val)) <= 5:
+                    spot_values[mod] = np.unique(val)
+                elif self.options["quantile"]:
+                    spot_values[mod] = np.percentile(val, [10, 25, 50, 75, 90])
+                else:
+                    m = val.mean()
+                    std = val.std(ddof=1)
+                    spot_values[mod] = [m - std, m, m + std]
+            else:
+                spot_values[mod] = spotvals
+        return spot_values
+
     def _gen_direct_effect_model(self):
-        mod_names = self._moderators["x_direct"]
-        dem = DirectEffectModel(self.outcome_models[self.iv], mod_names, self.spotlight_values, self.has_mediation,
+        mod_names = self.moderators["x_direct"]
+        model_iv = self.outcome_models[self.iv]
+        dem = DirectEffectModel(model_iv, mod_names, self.spotlight_values, self.has_mediation,
                                 self._symb_to_var, self.options)
         return dem
 
@@ -851,9 +769,9 @@ class Process(object):
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
         data_array = self.data.values
-        mod_symb = self._moderators["indirect"]
+        mod_symb = self.moderators["indirect"]
         spot_values = self.spotlight_values
-        analysis_list = self._get_analysis_list()
+        analysis_list = self._gen_analysis_list()
         iem = ParallelMediationModel(data_array, y_exogvars, m_exogvars, mod_symb, spot_values, self.n_meds,
                                      analysis_list, self._symb_to_ind, self._symb_to_var, self.options)
         return iem
@@ -874,7 +792,7 @@ class Process(object):
         if controls:
             initstr += f"\nStatistical Controls:\n {', '.join(controls)}\n\n"
 
-        meancentered = self._centered_vars
+        meancentered = self.centered_vars
         if meancentered:
             initstr += f"\nMean-centered variables:\n {', '.join([self._symb_to_var.get(v) for v in meancentered])}\n\n"
 
@@ -887,6 +805,107 @@ class Process(object):
                         f"Number of samples discarded due to convergence issues: {self.indirect_model._n_fail_samples}")
 
         print(initstr)
+
+    def _gen_analysis_list(self):
+        """
+        Process always report the indirect effect/conditional indirect effect(s).
+        If one moderator is present, Process will report the Moderated Mediation Index (MM).
+        If exactly two moderators are present, additional analysis could be reported: the
+        Conditional Moderated Mediation (CMM), the Moderated Moderated Mediation (MMM), and the
+        Partial Moderated Mediation (PMM). This function establishes which of those statistics should be reported:
+          1. If the two moderators are on two different paths (X to M, or M to Y): both CMM and MMM are reported.
+          2. If the two moderators are on the same path and form a 3-way interaction: both CMM and MMM are reported.
+          3. If the two moderators are on the same path and do not form a 3-way: the PMM is reported.
+          4. If at least one of the two moderators is present on both paths: no analysis is reported.
+
+        This function returns the list of additional analysis to report. If no additional analysis must be performed,
+         this list is empty.
+        :return: list
+            ["MM"], ["MMM", "CMM"], ["PMM"] or []
+        """
+        n_mods_x = len(self.moderators["x_indirect"])
+        n_mods_m = len(self.moderators["m"])
+        n_mods = n_mods_m + n_mods_x
+        y_exogvars = self._equations[0][1]
+        m_exogvars = self._equations[1][1]
+
+        if n_mods == 0:  # No moderators, so no additional analysis.
+            return []
+
+        terms = y_exogvars + m_exogvars
+        threeway = any(
+            [1 if len(term.split("*")) == 3 else 0 for term in terms])  # Find if there is any three-way interaction
+
+        if n_mods == 1:
+            return ["MM"]
+        elif n_mods == 2:
+            if (n_mods_m == 1) or threeway:  # Moderators on two different paths
+                return ["MMM", "CMM"]
+            else:
+                return ["PMM"]
+        else:
+            return []
+
+    def _parse_moderator_values(self, x, hue, row, col, modval, path):
+        # Values for x-axis
+        x_values = modval.get(x)
+        if x_values is None:
+            x_symb = self._var_to_symb[x]
+            xdata = self.data[x_symb]
+            if len(np.unique(xdata)) == 2:
+                x_values = np.unique(xdata)
+            else:
+                x_values = np.linspace(xdata.min(), xdata.max(), 100)
+
+        # Values for hue
+        if isinstance(hue, str):
+            huevar1 = hue
+            huevar2 = None
+            hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
+            hue2_values = [0]
+        elif isinstance(hue, list):
+            if len(hue) == 2:
+                huevar1 = hue[0]
+                huevar2 = hue[1]
+                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
+                hue2_values = modval.get(huevar2, self.spotlight_values.get(huevar2))
+            elif len(hue) == 1:
+                huevar1 = hue[0]
+                huevar2 = None
+                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
+                hue2_values = [0]
+            else:
+                raise ValueError("The argument 'hue' must be a string or a list of length 1 or 2.")
+        else:
+            huevar1 = None
+            huevar2 = None
+            hue1_values = [0]
+            hue2_values = [0]
+
+        col_values = modval.get(col, self.spotlight_values.get(col, [0]))
+        row_values = modval.get(row, self.spotlight_values.get(row, [0]))
+
+        mod_names = [x, huevar1, huevar2, col, row]
+        mod_values = [x_values, hue1_values, hue2_values, col_values, row_values]
+
+        modval_vars = {n: v for (n, v) in zip(mod_names, mod_values) if n is not None}
+        modval_others = {k: v for k, v in modval.items() if k not in modval_vars}
+        modval_others_invalid = any([len(v) > 1 for k, v in modval_others.items()])
+
+        if modval_others_invalid:
+            raise SyntaxError(
+                "You cannot specify more than one focal value for moderator that is not displayed in the graph.")
+
+        modval_parsed = {**modval_others, **modval_vars}
+
+        for m in self.moderators[path]:
+            m_var = self._symb_to_var[m]
+            if modval_parsed.get(m_var) is None:
+                warnings.warn(
+                    f'The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on\
+                     the graph. Its value has been explicitely set to 0.', SyntaxWarning)
+                modval_parsed[m_var] = [0]
+        return modval_parsed
 
     # API
     def summary(self):
@@ -934,9 +953,8 @@ class Process(object):
         return df.reset_index()
 
     def floodlight_indirect_effect(self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5):
-        try:
-            mod_symb = self._var_to_symb[mod_name]
-        except:
+        mod_symb = self._var_to_symb.get(mod_name)
+        if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
 
         other_modval_symb = {}
@@ -953,10 +971,10 @@ class Process(object):
         if not self.has_mediation:
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
-        if mod_symb not in self._moderators["indirect"]:
+        if mod_symb not in self.moderators["indirect"]:
             raise ValueError(f"The variable {mod_name} does not moderate the indirect path in Model {self.model_num}.")
 
-        for ms in self._moderators["indirect"]:
+        for ms in self.moderators["indirect"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
                 other_modval_symb[ms] = 0
 
@@ -964,22 +982,21 @@ class Process(object):
             raise ValueError("You must specify the name of the mediator for which to plot the indirect effects")
 
         try:
-            med_index = self._var_kwargs.get("m").index(med_name)
+            med_index = self.mediators.index(med_name)
         except ValueError:
             raise ValueError(f"The variable {med_name} is not a mediator in the model.")
 
         mod_values = self.data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
         sig_regions = self.indirect_model._floodlight_analysis(med_index, mod_symb, modval_range,
-                                                              other_modval_symb, atol=atol, rtol=rtol)
+                                                               other_modval_symb, atol=atol, rtol=rtol)
         prec = self.options['precision']
-        other_modval_name = {self._symb_to_var[k]:v for k, v in other_modval_symb.items()}
+        other_modval_name = {self._symb_to_var[k]: v for k, v in other_modval_symb.items()}
         return IndirectFloodlightAnalysis(med_name, mod_name, sig_regions, modval_range, other_modval_name, prec)
 
     def floodlight_direct_effect(self, mod_name, other_modval=None, atol=1e-8, rtol=1e-5):
-        try:
-            mod_symb = self._var_to_symb[mod_name]
-        except:
+        mod_symb = self._var_to_symb.get(mod_name)
+        if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
 
         other_modval_symb = {}
@@ -993,18 +1010,18 @@ class Process(object):
                 else:
                     other_modval_symb[symb] = v
 
-        if mod_symb not in self._moderators["x_direct"]:
+        if mod_symb not in self.moderators["x_direct"]:
             raise ValueError(f"The variable {mod_name} does not moderate the direct path in Model {self.model_num}.")
 
-        for ms in self._moderators["x_direct"]:
+        for ms in self.moderators["x_direct"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
                 other_modval_symb[ms] = 0
 
         mod_values = self.data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
         sig_regions = self.direct_model._floodlight_analysis(mod_symb, modval_range, other_modval_symb,
-                                                            atol=atol, rtol=rtol)
-        other_modval_name = {self._symb_to_var[k]:v for k, v in other_modval_symb.items()}
+                                                             atol=atol, rtol=rtol)
+        other_modval_name = {self._symb_to_var[k]: v for k, v in other_modval_symb.items()}
         prec = self.options["precision"]
         return DirectFloodlightAnalysis(mod_name, sig_regions, modval_range, other_modval_name, prec)
 
@@ -1023,14 +1040,14 @@ class Process(object):
         if not self.has_mediation:
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
-        if len(self._moderators["indirect"]) == 0:
+        if len(self.moderators["indirect"]) == 0:
             raise ValueError(f"The indirect path of Model {self.model_num} does not include a moderator.")
 
         if not med_name:
             raise ValueError("You must specify the name of the mediator for which to plot the indirect effects")
 
         try:
-            med_index = self._var_kwargs.get("m").index(med_name)
+            med_index = self.mediators.index(med_name)
         except ValueError:
             raise ValueError(f"The variable {med_name} is not a mediator in the model.")
 
@@ -1067,7 +1084,7 @@ class Process(object):
         :return:
             A DataFrame of direct Effects/SE/LLCI/ULCI, at various levels of the moderators.
         """
-        if self._moderators["x_direct"] == []:
+        if not self.moderators["x_direct"]:
             raise ValueError(f"The direct path of Model {self.model_num} does not include a moderator.")
 
         spotval_symb = self.spotlight_values.copy()
@@ -1149,8 +1166,8 @@ class Process(object):
 
         modval_parsed = self._parse_moderator_values(x, hue, row, col, modval, "x_direct")
         df_effects = self.spotlight_direct_effect(spotval=modval_parsed)
-        return self._plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
-                                              plot_kws, err_kws)
+        return plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
+                                        plot_kws, err_kws)
 
     def plot_conditional_indirect_effects(self, med_name=None, x=None, hue=None, row=None, col=None, modval=None,
                                           errstyle="band", hue_format=None, facet_kws=None, plot_kws=None,
@@ -1209,132 +1226,16 @@ class Process(object):
         modval_parsed = self._parse_moderator_values(x, hue, row, col, modval, path="indirect")
         df_effects = self.spotlight_indirect_effect(med_name=med_name, spotval=modval_parsed)
 
-        return self._plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
-                                              plot_kws, err_kws)
-
-    def _parse_moderator_values(self, x, hue, row, col, modval, path):
-        # Values for x-axis
-        x_values = modval.get(x)
-        if x_values is None:
-            x_symb = self._var_to_symb[x]
-            xdata = self.data[x_symb]
-            if len(np.unique(xdata)) == 2:
-                x_values = np.unique(xdata)
-            else:
-                x_values = np.linspace(xdata.min(), xdata.max(), 100)
-
-        # Values for hue
-        if isinstance(hue, str):
-            huevar1 = hue
-            huevar2 = None
-            hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
-            hue2_values = [0]
-        elif isinstance(hue, list):
-            if len(hue) == 2:
-                huevar1 = hue[0]
-                huevar2 = hue[1]
-                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
-                hue2_values = modval.get(huevar2, self.spotlight_values.get(huevar2))
-            elif len(hue) == 1:
-                huevar1 = hue[0]
-                huevar2 = None
-                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
-                hue2_values = [0]
-            else:
-                raise ValueError("The argument 'hue' must be a string or a list of length 1 or 2.")
-        else:
-            huevar1 = None
-            huevar2 = None
-            hue1_values = [0]
-            hue2_values = [0]
-
-        col_values = modval.get(col, self.spotlight_values.get(col, [0]))
-        row_values = modval.get(row, self.spotlight_values.get(row, [0]))
-
-        mod_names = [x, huevar1, huevar2, col, row]
-        mod_values = [x_values, hue1_values, hue2_values, col_values, row_values]
-
-        modval_vars = {n: v for (n, v) in zip(mod_names, mod_values) if n is not None}
-        modval_others = {k: v for k, v in modval.items() if k not in modval_vars}
-        modval_others_invalid = any([len(v) > 1 for k, v in modval_others.items()])
-
-        if modval_others_invalid:
-            raise SyntaxError(
-                "You cannot specify more than one focal value for moderator that is not displayed in the graph.")
-
-        modval_parsed = {**modval_others, **modval_vars}
-
-        for m in self._moderators[path]:
-            m_var = self._symb_to_var[m]
-            if modval_parsed.get(m_var) is None:
-                warnings.warn(
-                    f'The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on the graph. Its value has been explicitely set to 0.',
-                    SyntaxWarning)
-                modval_parsed[m_var] = [0]
-        return modval_parsed
-
-    def _plot_conditional_effects(self, df_effects, x, hue, row, col, errstyle, hue_format, facet_kws, plot_kws,
-                                  err_kws):
-        if isinstance(hue, list):
-            huename = "Hue"
-            if len(hue) == 2:
-                if hue_format is None:
-                    hue_format = "{var1} at {hue1:.2f},  {var2} at {hue2:.2f}"
-                df_effects["Hue"] = df_effects[hue].apply(lambda x: hue_format.format(
-                    var1=hue[0],
-                    var2=hue[1],
-                    hue1=x[hue[0]],
-                    hue2=x[hue[1]]), axis=1)
-            else:
-                if hue_format is None:
-                    hue_format = "{var1} at {hue1:.2f}"
-                df_effects["Hue"] = df_effects[hue[0]].apply(lambda x: hue_format.format(var1=hue[0], hue1=x))
-        elif isinstance(hue, str):
-            huename = "Hue"
-            if hue_format is None:
-                hue_format = "{var1} at {hue1:.2f}"
-            df_effects["Hue"] = df_effects[hue].apply(lambda x: hue_format.format(var1=hue, hue1=x))
-        else:
-            huename = None
-
-        if not facet_kws:
-            facet_kws = {}
-        if not plot_kws:
-            plot_kws = {}
-
-        g = FacetGrid(hue=huename, data=df_effects, col=col, row=row, **facet_kws)
-
-        if errstyle == "band":
-            if not err_kws:
-                err_kws = {'alpha': 0.2}
-            g.map(plot_errorbands, x, "Effect", "LLCI", "ULCI", plot_kws=plot_kws, err_kws=err_kws)
-        elif errstyle == "ci":
-            if not err_kws:
-                err_kws = {'alpha': 1,
-                           'capthick': 1,
-                           'capsize': 3}
-            df_effects["yerr_low"] = (df_effects["Effect"] - df_effects["LLCI"])
-            df_effects["yerr_high"] = (df_effects["ULCI"] - df_effects["Effect"])
-            g.map(plot_errorbars, x, "Effect", "yerr_low", "yerr_high", plot_kws=plot_kws, err_kws=err_kws)
-        elif errstyle == "none":
-            g.map(plt.plot, x, "Effect", **plot_kws)
-
-        if facet_kws.get('margin_titles'):
-            for ax in g.axes.flat:
-                plt.setp(ax.texts, text="")
-
-        if row and col:
-            g.set_titles(row_template='{row_var} at {row_name:.2f}', col_template='{col_var} at {col_name:.2f}')
-
-        return g
+        return plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
+                                        plot_kws, err_kws)
 
     # DEPRECATED METHODS
-    def plot_indirect_effects(self, med_name=None, x=None, hue=None, row=None, col=None, mods_at=None,
-                              errstyle="band", hue_format=None, facet_kws=None, plot_kws=None, err_kws=None):
+    def plot_indirect_effects(self, *args, **kwargs):
         raise DeprecationWarning(
-            "The method 'plot_indirect_effects' has been deprecated. Please use the equivalent method named 'plot_conditional_indirect_effects.")
+            "The method 'plot_indirect_effects' has been deprecated. Please use the equivalent method named \
+            'plot_conditional_indirect_effects.")
 
-    def plot_direct_effects(self, x=None, hue=None, row=None, col=None, mods_at=None,
-                            errstyle="band", hue_format=None, facet_kws=None, plot_kws=None, err_kws=None):
+    def plot_direct_effects(self, *args, **kwargs):
         raise DeprecationWarning(
-            "The method 'plot_direct_effects' has been deprecated. Please use the equivalent method named 'plot_conditional_direct_effects.")
+            "The method 'plot_direct_effects' has been deprecated. Please use the equivalent method named \
+            'plot_conditional_direct_effects.")

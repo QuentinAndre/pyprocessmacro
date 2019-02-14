@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
+import warnings
+from functools import partial
+from itertools import product, combinations
+
 import numpy as np
+import pandas as pd
+import scipy.stats as stats
+from numpy import dot
+from numpy.linalg import inv, LinAlgError
+
 from .utils import fast_OLS, fast_optimize, bootstrap_sampler, eval_expression, bias_corrected_ci, z_score, \
     percentile_ci, find_significance_region
-import scipy.stats as stats
-from numpy.linalg import inv, LinAlgError
-from numpy import dot
-from itertools import product, combinations
-import pandas as pd
-from functools import partial
-import warnings
+
 
 class BaseLogit(object):
     """
@@ -65,8 +68,13 @@ class BaseLogit(object):
         max_iter = self._options["iterate"]
         tolerance = self._options["convergence"]
         iterations = 0
-        score = lambda params: self._score(params) / self._n_obs
-        hess = lambda params: -self._hessian(params) / self._n_obs
+
+        def score(params):
+            return self._score(params) / self._n_obs
+
+        def hess(params):
+            return -self._hessian(params) / self._n_obs
+
         oldparams = np.inf
         newparams = np.repeat(0, self._n_vars)
         while iterations < max_iter and np.any(np.abs(newparams - oldparams) > tolerance):
@@ -84,6 +92,325 @@ class NullLogitModel(BaseLogit):
         if not options:
             options = {}
         super().__init__(endog, exog, options)
+
+
+class BaseOutcomeModel(object):
+    """
+    A statistical model reflecting the path from independent predictors (X, or X and M)
+    to an endogenous outcome (Y, or M).
+    """
+
+    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+        """
+        Instantiate the model.
+        :param data: np.array
+            A NxK array of data
+        :param endogvar: string
+            The name of the endogenous variable.
+        :param exogvars: list of strings
+            The names of the exogenous variables.
+        :param symb_to_ind: dict of int
+            A dictionary mapping variable symbols to indices.
+        :param symb_to_var: dict of strings
+            A dictionary mapping variable symbols to names.
+        :param options: dict
+            A dictionary of options.
+        """
+
+        if options is None:
+            options = {}
+        self._data = data
+        self._endogvar = endogvar
+        self._exogvars = exogvars
+        self._symb_to_ind = symb_to_ind
+        self._symb_to_var = symb_to_var
+        if not options:
+            options = {}
+        self._options = options
+
+        endog_ind = self._symb_to_ind[self._endogvar]
+        exog_ind = [self._symb_to_ind[var] for var in self._exogvars]
+        self._endog = data[:, endog_ind]
+        self._exog = data[:, exog_ind]
+        self._n_obs = self._exog.shape[0]
+        self._n_vars = self._exog.shape[1]
+
+        self._varnames = [i for i in self._exogvars if (("*" not in i) & (i != "Cons"))]
+        self._derivative = self._gen_derivative(wrt="x")
+
+        self.estimation_results = self._estimate()
+
+    def _gen_derivative(self, wrt):
+        """
+        Generate a symbolic derivative of the equation with respect to the variable 'wrt', and stores it in a matrix.
+
+        For instance (Model 21), we consider the equation aConstant + bX + cW + dX*W, that we derivate wrt to X:
+            * The rearranged equation for X is: 1*(aConstant + cW) + X*(b + dW).
+            * The derivative of this expression is: (b + dW), or in matrix form: [0, 1, 0, W] * [a, b, c, d]
+
+        The first vector depends on the value of the moderator W: therefore, it cannot be represented numerically.
+        Instead, we express derivative using the following technique:
+            * Each term in the equation (i.e. Constant, X, W, X*W) is represented by a row.
+            * Each variable is represented by a column.
+            * The column for X (the variable with respect to which the equation is derivated) is equal to 0 if the
+                term does not contain X, and 1 otherwise
+            * The other columns are equal to the variable if the term contains the variable, and to 1 otherwise.
+
+        That way, the product of the columns is equal to the value of each term in the derivative:
+           X  W
+        [[ 0, 1 ], # Value of the Constant term : 0*1 = 0
+         [ 1, 1 ], # Value of X term : 1*1 = 1
+         [ 0, W ], # Value of the W term: 0*W = 0
+         [ 1, W ]] # Value of the X*W: 1*W = W
+
+        The advantage of this matrix is that it is a symbolic expression, in which we can substitute for the values of
+        the moderators, and then take the product of columns to obtain the numerical representation of the derivative
+        as a vector.
+
+        :return: A matrix of size (n_terms x n_vars)
+        """
+        deriv = np.empty((len(self._varnames), len(self._exogvars)), dtype="object")
+        for i, var in enumerate(self._varnames):
+            if var == wrt:
+                deriv[i] = [1 if var in term else 0 for term in self._exogvars]
+            else:
+                deriv[i] = [var if var in term else 1 for term in self._exogvars]
+        return deriv.T
+
+    def coeff_summary(self):
+        """
+        Get the estimates of the terms in the model.
+        :return: A DataFrame of betas, se, t (or z), p, llci, ulci for all variables of the model.
+        """
+        results = self.estimation_results
+        if results:
+            if "t" in results.keys():  # Model has t-stats rather than z-stats
+                coeffs = np.array(
+                    [results["betas"], results["se"], results["t"], results["p"], results["llci"], results["ulci"]]).T
+                df = pd.DataFrame(coeffs, index=results["names"],
+                                  columns=["coeff", "se", "t", "p", "LLCI", "ULCI"])
+            else:  # Model has z-stats.
+                coeffs = np.array(
+                    [results["betas"], results["se"], results["z"], results["p"], results["llci"], results["ulci"]]).T
+                df = pd.DataFrame(coeffs, index=results["names"],
+                                  columns=["coeff", "se", "Z", "p", "LLCI", "ULCI"])
+        else:
+            raise NotImplementedError(
+                "The model has not been estimated yet. Please estimate the model first."
+            )
+        return df
+
+    def _estimate(self):
+        pass
+
+
+class OLSOutcomeModel(BaseOutcomeModel):
+    """
+    An OLS subclass for OutcomeModels. Implement methods specific to the OLS estimation.
+    """
+
+    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+        super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
+
+    def _estimate(self):
+        """
+        Estimate the coefficients and statistics of the OLS model, and store the results in a dictionary of
+        estimation_results.
+        :return: self
+        """
+        y = self._endog
+        x = self._exog
+        n_obs = self._n_obs
+        n_vars = self._n_vars
+        inv_xx = inv(dot(x.T, x))
+        xy = dot(x.T, y)
+        betas = dot(inv_xx, xy)
+        df_e = n_obs - n_vars
+        df_r = n_vars - 1
+        resid = y - dot(x, betas)
+        mse = (resid ** 2).sum() / df_e
+        sse = dot(resid.T, resid) / df_e
+        errortype = "standard" if self._options["hc3"] == 1 else "HC3"
+        if errortype == 'standard':
+            vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
+        elif errortype == 'HC0':
+            sq_resid = (resid ** 2).squeeze()
+            vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
+        elif errortype == 'HC1':
+            sq_resid = (resid ** 2).squeeze()
+            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
+        elif errortype == 'HC2':
+            sq_resid = (resid ** 2).squeeze()
+            H = (x.dot(inv_xx) * x).sum(axis=-1)
+            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / (1 - H)), x), inv_xx)
+        elif errortype == 'HC3':
+            sq_resid = (resid ** 2).squeeze()
+            H = (x.dot(inv_xx) * x).sum(axis=-1)
+            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / ((1 - H) ** 2)), x), inv_xx)
+        else:
+            raise ValueError("The covariance type {} is not supported. Please specify 'standard', 'HC0'"
+                             "'HC1', 'HC2', or 'HC3".format(errortype))
+
+        betas = betas.squeeze()
+        se = np.sqrt(np.diagonal(vcv)).squeeze()
+        t = betas / se
+        p = stats.t.sf(np.abs(t), df_e) * 2
+        conf = self._options["conf"]
+        zscore = z_score(conf)
+        R2 = 1 - resid.var() / y.var()
+        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / (n_obs - n_vars - 1))
+        F = (R2 / df_r) / ((1 - R2) / df_e)
+        F_pval = 1 - stats.f.cdf(F, df_r, df_e)
+        llci = betas - (se * zscore)
+        ulci = betas + (se * zscore)
+        names = [self._symb_to_var.get(x, x) for x in self._exogvars]
+        estimation_results = {"betas": betas,
+                              "se": se,
+                              "vcv": vcv,
+                              "t": t,
+                              "p": p,
+                              "R2": R2,
+                              "adjR2": adjR2,
+                              "df_e": int(df_e),
+                              "df_r": int(df_r),
+                              "mse": mse,
+                              "F": F,
+                              "sse": sse,
+                              "F_pval": F_pval,
+                              "llci": llci,
+                              "ulci": ulci,
+                              "names": names,
+                              "n": int(n_obs)}
+        return estimation_results
+
+    def model_summary(self):
+        """
+        The summary of the model statistics: R², F-stats, etc...
+        :return: A DataFrame of model statistics
+        """
+        results = self.estimation_results
+        statistics = ["R2", "adjR2", "mse", "F", "df_r", "df_e", "F_pval"]
+        row = [[results[s] for s in statistics]]
+        df = pd.DataFrame(row, index=[""], columns=["R²", "Adj. R²", "MSE", "F", "df1", "df2", "p-value"])
+        return df
+
+    def coeff_summary(self):
+        """
+        The summary of the OLS estimates for the model: betas, se, t, p-values, etc...
+        :return: A DataFrame of coefficient statistics
+        """
+        return super().coeff_summary()
+
+    def summary(self):
+        """
+        Pretty-print the summary with text. Used by Process to display the model and coefficients in a nicer way.
+        :return: A string to display.
+        """
+        prec = self._options["precision"]
+        float_format = partial('{:.{prec}f}'.format, prec=prec)
+        basestr = ("Outcome = {} \n"
+                   "OLS Regression Summary\n\n{}\n\n"
+                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
+                                               self.model_summary().to_string(float_format=float_format),
+                                               self.coeff_summary().to_string(float_format=float_format)))
+        return basestr
+
+    def __str__(self):
+        return self.summary()
+
+
+class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
+    """
+    A Logit subclass for OutcomeModels. Implement methods specific to the Logistic estimation.
+    """
+
+    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+        super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
+
+    def _estimate(self):
+        """
+        Estimate the coefficients and statistics of the Logistic model, and store the results in a dictionary of
+        estimation_results.
+        :return: self
+        """
+        betas = self._optimize()
+        vcv = inv(self._hessian(betas))
+
+        se = np.sqrt(np.diagonal(vcv)).squeeze()
+        z = betas / se
+        p = stats.norm.sf(np.abs(z)) * 2
+        conf = self._options["conf"]
+        zscore = z_score(conf)
+        llci = betas - (se * zscore)
+        ulci = betas + (se * zscore)
+
+        # GOF statistics
+        llmodel = self._loglike(betas)
+        lmodel = np.exp(llmodel)
+        minus2ll = -2 * llmodel
+
+        null_model = NullLogitModel(self._endog, self._options)
+        betas_null = null_model._optimize()
+        llnull = null_model._loglike(betas_null)
+        lnull = np.exp(llnull)
+
+        d = 2 * (llmodel - llnull)
+        pvalue = stats.chi2.sf(d, self._n_vars - 1)
+        mcfadden = 1 - llmodel / llnull
+        coxsnell = 1 - (lnull / lmodel) ** (2 / self._n_obs)
+        nagelkerke = coxsnell / (1 - lnull ** (2 / self._n_obs))
+        names = [self._symb_to_var.get(x, x) for x in self._exogvars]
+        estimation_results = {"betas": betas,
+                              "se": se,
+                              "vcv": vcv,
+                              "z": z,
+                              "p": p,
+                              "llci": llci,
+                              "ulci": ulci,
+                              "mcfadden": mcfadden,
+                              "coxsnell": coxsnell,
+                              "nagelkerke": nagelkerke,
+                              "d": d,
+                              "minus2ll": minus2ll,
+                              "pvalue": pvalue,
+                              "n": int(self._n_obs),
+                              "names": names}
+        return estimation_results
+
+    def model_summary(self):
+        """
+        The summary of the model statistics: Model LL, pseudo R², etc...
+        :return: A DataFrame of model statistics
+        """
+        results = self.estimation_results
+        row = [[results[i] for i in ["minus2ll", "d", "pvalue", "mcfadden", "coxsnell", "nagelkerke", "n"]]]
+        return pd.DataFrame(row, index=[""],
+                            columns=["-2LL", "Model LL", "p-value", "McFadden", "Cox-Snell", "Nagelkerke", "n"])
+
+    def coeff_summary(self):
+        """
+        The summary of the OLS estimates for the model: betas, se, t, p-values, etc...
+        :return: A DataFrame of coefficient statistics
+        """
+        return super().coeff_summary()
+
+    def summary(self):
+        """
+        Pretty-print the summary with text. Used by Process to display the model and coefficients in a nicer way.
+        :return: A string to display.
+        """
+        prec = self._options["precision"]
+        float_format = partial('{:.{prec}f}'.format, prec=prec)
+        basestr = ("\n**************************************************************************\n"
+                   "Outcome = {} \n"
+                   "Logistic Regression Summary\n\n{}\n\n"
+                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
+                                               self.model_summary().to_string(float_format=float_format),
+                                               self.coeff_summary().to_string(float_format=float_format)))
+        return basestr
+
+    def __str__(self):
+        return self.summary()
 
 
 class ParallelMediationModel(object):
@@ -441,15 +768,17 @@ class ParallelMediationModel(object):
         n_boots = self._options["boot"]
         (mod,) = self._moderators_symb  # Only one moderator
 
-        dict_baseline = dict([[mod, 0]]) # Only moderator at 0
+        # noinspection PyTypeChecker
+        dict_baseline = dict([[mod, 0]])  # Only moderator at 0
         e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_effect = dict([[mod, 1]]) # Only moderator at 1
+        # noinspection PyTypeChecker
+        dict_effect = dict([[mod, 1]])  # Only moderator at 1
         e_effect, be_effect = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
         effects, se, llci, ulci = np.empty((4, self._n_meds))
 
-        for i in range(self._n_meds): #... For all the mediators
+        for i in range(self._n_meds):  # ... For all the mediators
             e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
             e_effect[i], be_effect[i], *_ = self._indirect_effect_at(i, dict_effect)
 
@@ -481,12 +810,15 @@ class ParallelMediationModel(object):
         n_boots = self._options["boot"]
         mod1, mod2 = self._moderators_symb  # Only two moderators
 
+        # noinspection PyTypeChecker
         dict_baseline = dict([[mod1, 0], [mod2, 0]])
         e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
+        # noinspection PyTypeChecker
         dict_mod1 = dict([[mod1, 1], [mod2, 0]])
         e_mod1, be_mod1 = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
+        # noinspection PyTypeChecker
         dict_mod2 = dict([[mod1, 0], [mod2, 1]])
         e_mod2, be_mod2 = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
@@ -499,13 +831,13 @@ class ParallelMediationModel(object):
             e_pmm1 = e_mod1[i] - e_baseline[i]  # Effect of Moderator1 at 1 vs. Moderator1 at 0
             e_pmm2 = e_mod2[i] - e_baseline[i]  # Effect of Moderator2 at 1 vs. Moderator2 at 0
 
-            be_pmm1 = be_mod1[i] - be_baseline[i] # Bootstrapped effects of...
+            be_pmm1 = be_mod1[i] - be_baseline[i]  # Bootstrapped effects of...
             be_pmm2 = be_mod2[i] - be_baseline[i]
 
-            effects[0][i] = e_pmm1 # PMM of first moderator
+            effects[0][i] = e_pmm1  # PMM of first moderator
             se[0][i] = be_pmm1.std(ddof=1)
 
-            effects[1][i] = e_pmm2 # PMM of second moderator
+            effects[1][i] = e_pmm2  # PMM of second moderator
             se[1][i] = be_pmm2.std(ddof=1)
 
             if self._options["percent"]:
@@ -533,13 +865,16 @@ class ParallelMediationModel(object):
         n_boots = self._options["boot"]
         mod1, mod2 = self._moderators_symb  # Only two moderators
 
-        dict_both_on = dict([[mod1, 1], [mod2, 1]]) # Both moderators are on
+        # noinspection PyTypeChecker
+        dict_both_on = dict([[mod1, 1], [mod2, 1]])  # Both moderators are on
         e_both_on, be_both_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_mod1_on = dict([[mod1, 2], [mod2, 0]]) # Only the first moderator is on
+        # noinspection PyTypeChecker
+        dict_mod1_on = dict([[mod1, 2], [mod2, 0]])  # Only the first moderator is on
         e_mod1_on, be_mod1_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
-        dict_mod2_on = dict([[mod1, 0], [mod2, 2]]) # Only the second moderator is on
+        # noinspection PyTypeChecker
+        dict_mod2_on = dict([[mod1, 0], [mod2, 2]])  # Only the second moderator is on
         e_mod2_on, be_mod2_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
 
         effects, se, llci, ulci = np.empty((4, 1, self._n_meds))
@@ -575,17 +910,18 @@ class ParallelMediationModel(object):
             A mod_symb:mod_value dictionary of values for the other moderators of the direct path.
         """
 
-        def spotlight_wrapper(f, med_index):
+        def spotlight_wrapper(f, i):
             def wrapped(dict_modval):
-                b, be, se, llci, ulci = f(med_index, dict_modval)
+                b, be, se, llci, ulci = f(i, dict_modval)
                 return b, se, llci, ulci
+
             return wrapped
+
         spotlight_func = spotlight_wrapper(self._indirect_effect_at, med_index)
         modval_min, modval_max = modval_range
         sig_region = find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, other_modval_symb,
                                               atol=atol, rtol=rtol)
         return sig_region
-
 
     def _CMM_index(self):
         """
@@ -609,7 +945,9 @@ class ParallelMediationModel(object):
 
         for i in range(self._n_meds):
             for j, val in enumerate(mod1_val):  # Conditional moderated mediation effects for Moderator 1
+                # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
+                # noinspection PyTypeChecker
                 dict_on = dict([[mod1, val], [mod2, 1]])
                 e_off, be_off, *_ = self._indirect_effect_at(i, dict_off)
                 e_on, be_on, *_ = self._indirect_effect_at(i, dict_on)
@@ -624,7 +962,9 @@ class ParallelMediationModel(object):
                     llci_mod1[i][j], ulci_mod1[i][j] = bias_corrected_ci(e_cmm, be_cmm, conf)
 
             for j, val in enumerate(mod2_val):  # Conditional moderated mediation effects for Moderator 1
+                # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
+                # noinspection PyTypeChecker
                 dict_on = dict([[mod1, val], [mod2, 1]])
                 e_off, be_off, *_ = self._indirect_effect_at(i, dict_off)
                 e_on, be_on, *_ = self._indirect_effect_at(i, dict_on)
@@ -665,6 +1005,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def _simple_ind_effects_wrapper(self):
@@ -690,6 +1031,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = ["", "Effect", "Boot SE", "BootLLCI", "BootULCI"]
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def _MM_index_wrapper(self):
@@ -712,6 +1054,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def _PMM_index_wrapper(self):
@@ -734,6 +1077,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def _CMM_index_wrapper(self):
@@ -767,6 +1111,7 @@ class ParallelMediationModel(object):
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
 
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def _MMM_index_wrapper(self):
@@ -787,6 +1132,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
+        # noinspection PyTypeChecker
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def MM_index_summary(self):
@@ -845,319 +1191,6 @@ class ParallelMediationModel(object):
             results = get_results()
             basestr += "**************** INDEX OF {name} ******************\n\n" \
                        "{results}\n\n".format(name=name, results=results.to_string(float_format=float_format))
-        return basestr
-
-    def __str__(self):
-        return self.summary()
-
-
-class BaseOutcomeModel(object):
-    """
-    A statistical model reflecting the path from independent predictors (X, or X and M)
-    to an endogenous outcome (Y, or M).
-    """
-
-    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
-        """
-        Instantiate the model.
-        :param data: np.array
-            A NxK array of data
-        :param endogvar: string
-            The name of the endogenous variable.
-        :param exogvars: list of strings
-            The names of the exogenous variables.
-        :param symb_to_ind: dict of int
-            A dictionary mapping variable symbols to indices.
-        :param symb_to_var: dict of strings
-            A dictionary mapping variable symbols to names.
-        :param options: dict
-            A dictionary of options.
-        """
-
-        if options is None:
-            options = {}
-        self._data = data
-        self._endogvar = endogvar
-        self._exogvars = exogvars
-        self._symb_to_ind = symb_to_ind
-        self._symb_to_var = symb_to_var
-        if not options:
-            options = {}
-        self._options = options
-
-        endog_ind = self._symb_to_ind[self._endogvar]
-        exog_ind = [self._symb_to_ind[var] for var in self._exogvars]
-        self._endog = data[:, endog_ind]
-        self._exog = data[:, exog_ind]
-        self._n_obs = self._exog.shape[0]
-        self._n_vars = self._exog.shape[1]
-
-        self._varnames = [i for i in self._exogvars if (("*" not in i) & (i != "Cons"))]
-        self._derivative = self._gen_derivative(wrt="x")
-
-        self.estimation_results = self._estimate()
-
-    def _gen_derivative(self, wrt):
-        """
-        Generate a symbolic derivative of the equation with respect to the variable 'wrt', and stores it in a matrix.
-
-        For instance (Model 21), we consider the equation aConstant + bX + cW + dX*W, that we derivate wrt to X:
-            * The rearranged equation for X is: 1*(aConstant + cW) + X*(b + dW).
-            * The derivative of this expression is: (b + dW), or in matrix form: [0, 1, 0, W] * [a, b, c, d]
-
-        The first vector depends on the value of the moderator W: therefore, it cannot be represented numerically.
-        Instead, we express derivative using the following technique:
-            * Each term in the equation (i.e. Constant, X, W, X*W) is represented by a row.
-            * Each variable is represented by a column.
-            * The column for X (the variable with respect to which the equation is derivated) is equal to 0 if the
-                term does not contain X, and 1 otherwise
-            * The other columns are equal to the variable if the term contains the variable, and to 1 otherwise.
-
-        That way, the product of the columns is equal to the value of each term in the derivative:
-           X  W
-        [[ 0, 1 ], # Value of the Constant term : 0*1 = 0
-         [ 1, 1 ], # Value of X term : 1*1 = 1
-         [ 0, W ], # Value of the W term: 0*W = 0
-         [ 1, W ]] # Value of the X*W: 1*W = W
-
-        The advantage of this matrix is that it is a symbolic expression, in which we can substitute for the values of
-        the moderators, and then take the product of columns to obtain the numerical representation of the derivative
-        as a vector.
-
-        :return: A matrix of size (n_terms x n_vars)
-        """
-        deriv = np.empty((len(self._varnames), len(self._exogvars)), dtype="object")
-        for i, var in enumerate(self._varnames):
-            if var == wrt:
-                deriv[i] = [1 if var in term else 0 for term in self._exogvars]
-            else:
-                deriv[i] = [var if var in term else 1 for term in self._exogvars]
-        return deriv.T
-
-    def coeff_summary(self):
-        """
-        Get the estimates of the terms in the model.
-        :return: A DataFrame of betas, se, t (or z), p, llci, ulci for all variables of the model.
-        """
-        results = self.estimation_results
-        if results:
-            if "t" in results.keys():  # Model has t-stats rather than z-stats
-                coeffs = np.array(
-                    [results["betas"], results["se"], results["t"], results["p"], results["llci"], results["ulci"]]).T
-                df = pd.DataFrame(coeffs, index=results["names"],
-                                  columns=["coeff", "se", "t", "p", "LLCI", "ULCI"])
-            else:  # Model has z-stats.
-                coeffs = np.array(
-                    [results["betas"], results["se"], results["z"], results["p"], results["llci"], results["ulci"]]).T
-                df = pd.DataFrame(coeffs, index=results["names"],
-                                  columns=["coeff", "se", "Z", "p", "LLCI", "ULCI"])
-        else:
-            raise NotImplementedError(
-                "The model has not been estimated yet. Please estimate the model first."
-            )
-        return df
-
-    def _estimate(self):
-        pass
-
-
-class OLSOutcomeModel(BaseOutcomeModel):
-    """
-    An OLS subclass for OutcomeModels. Implement methods specific to the OLS estimation.
-    """
-
-    def _estimate(self):
-        """
-        Estimate the coefficients and statistics of the OLS model, and store the results in a dictionary of
-        estimation_results.
-        :return: self
-        """
-        y = self._endog
-        x = self._exog
-        n_obs = self._n_obs
-        n_vars = self._n_vars
-        inv_xx = inv(dot(x.T, x))
-        xy = dot(x.T, y)
-        betas = dot(inv_xx, xy)
-        df_e = n_obs - n_vars
-        df_r = n_vars - 1
-        resid = y - dot(x, betas)
-        mse = (resid ** 2).sum() / df_e
-        sse = dot(resid.T, resid) / df_e
-        errortype = "standard" if self._options["hc3"] == 1 else "HC3"
-        if errortype == 'standard':
-            vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
-        elif errortype == 'HC0':
-            sq_resid = (resid ** 2).squeeze()
-            vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
-        elif errortype == 'HC1':
-            sq_resid = (resid ** 2).squeeze()
-            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
-        elif errortype == 'HC2':
-            sq_resid = (resid ** 2).squeeze()
-            H = (x.dot(inv_xx) * x).sum(axis=-1)
-            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / (1 - H)), x), inv_xx)
-        elif errortype == 'HC3':
-            sq_resid = (resid ** 2).squeeze()
-            H = (x.dot(inv_xx) * x).sum(axis=-1)
-            vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / ((1 - H) ** 2)), x), inv_xx)
-        else:
-            raise ValueError("The covariance type {} is not supported. Please specify 'standard', 'HC0'"
-                             "'HC1', 'HC2', or 'HC3".format(errortype))
-
-        betas = betas.squeeze()
-        se = np.sqrt(np.diagonal(vcv)).squeeze()
-        t = betas / se
-        p = stats.t.sf(np.abs(t), df_e) * 2
-        conf = self._options["conf"]
-        zscore = z_score(conf)
-        R2 = 1 - resid.var() / y.var()
-        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / (n_obs - n_vars - 1))
-        F = (R2 / df_r) / ((1 - R2) / df_e)
-        F_pval = 1 - stats.f.cdf(F, df_r, df_e)
-        llci = betas - (se * zscore)
-        ulci = betas + (se * zscore)
-        names = [self._symb_to_var.get(x, x) for x in self._exogvars]
-        estimation_results = {"betas": betas,
-                              "se": se,
-                              "vcv": vcv,
-                              "t": t,
-                              "p": p,
-                              "R2": R2,
-                              "adjR2": adjR2,
-                              "df_e": int(df_e),
-                              "df_r": int(df_r),
-                              "mse": mse,
-                              "F": F,
-                              "sse": sse,
-                              "F_pval": F_pval,
-                              "llci": llci,
-                              "ulci": ulci,
-                              "names": names,
-                              "n": int(n_obs)}
-        return estimation_results
-
-    def model_summary(self):
-        """
-        The summary of the model statistics: R², F-stats, etc...
-        :return: A DataFrame of model statistics
-        """
-        results = self.estimation_results
-        statistics = ["R2", "adjR2", "mse", "F", "df_r", "df_e", "F_pval"]
-        row = [[results[s] for s in statistics]]
-        df = pd.DataFrame(row, index=[""], columns=["R²", "Adj. R²", "MSE", "F", "df1", "df2", "p-value"])
-        return df
-
-    def coeff_summary(self):
-        """
-        The summary of the OLS estimates for the model: betas, se, t, p-values, etc...
-        :return: A DataFrame of coefficient statistics
-        """
-        return super().coeff_summary()
-
-    def summary(self):
-        """
-        Pretty-print the summary with text. Used by Process to display the model and coefficients in a nicer way.
-        :return: A string to display.
-        """
-        prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
-        basestr = ("Outcome = {} \n"
-                   "OLS Regression Summary\n\n{}\n\n"
-                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
-                                               self.model_summary().to_string(float_format=float_format),
-                                               self.coeff_summary().to_string(float_format=float_format)))
-        return basestr
-
-    def __str__(self):
-        return self.summary()
-
-
-class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
-    """
-    A Logit subclass for OutcomeModels. Implement methods specific to the Logistic estimation.
-    """
-
-    def _estimate(self):
-        """
-        Estimate the coefficients and statistics of the Logistic model, and store the results in a dictionary of
-        estimation_results.
-        :return: self
-        """
-        betas = self._optimize()
-        vcv = inv(self._hessian(betas))
-
-        se = np.sqrt(np.diagonal(vcv)).squeeze()
-        z = betas / se
-        p = stats.norm.sf(np.abs(z)) * 2
-        conf = self._options["conf"]
-        zscore = z_score(conf)
-        llci = betas - (se * zscore)
-        ulci = betas + (se * zscore)
-
-        # GOF statistics
-        llmodel = self._loglike(betas)
-        lmodel = np.exp(llmodel)
-        minus2ll = -2 * llmodel
-
-        null_model = NullLogitModel(self._endog, self._options)
-        betas_null = null_model._optimize()
-        llnull = null_model._loglike(betas_null)
-        lnull = np.exp(llnull)
-
-        d = 2 * (llmodel - llnull)
-        pvalue = stats.chi2.sf(d, self._n_vars - 1)
-        mcfadden = 1 - llmodel / llnull
-        coxsnell = 1 - (lnull / lmodel) ** (2 / self._n_obs)
-        nagelkerke = coxsnell / (1 - lnull ** (2 / self._n_obs))
-        names = [self._symb_to_var.get(x, x) for x in self._exogvars]
-        estimation_results = {"betas": betas,
-                              "se": se,
-                              "vcv": vcv,
-                              "z": z,
-                              "p": p,
-                              "llci": llci,
-                              "ulci": ulci,
-                              "mcfadden": mcfadden,
-                              "coxsnell": coxsnell,
-                              "nagelkerke": nagelkerke,
-                              "d": d,
-                              "minus2ll": minus2ll,
-                              "pvalue": pvalue,
-                              "n": int(self._n_obs),
-                              "names": names}
-        return estimation_results
-
-    def model_summary(self):
-        """
-        The summary of the model statistics: Model LL, pseudo R², etc...
-        :return: A DataFrame of model statistics
-        """
-        results = self.estimation_results
-        row = [[results[i] for i in ["minus2ll", "d", "pvalue", "mcfadden", "coxsnell", "nagelkerke", "n"]]]
-        return pd.DataFrame(row, index=[""],
-                            columns=["-2LL", "Model LL", "p-value", "McFadden", "Cox-Snell", "Nagelkerke", "n"])
-
-    def coeff_summary(self):
-        """
-        The summary of the OLS estimates for the model: betas, se, t, p-values, etc...
-        :return: A DataFrame of coefficient statistics
-        """
-        return super().coeff_summary()
-
-    def summary(self):
-        """
-        Pretty-print the summary with text. Used by Process to display the model and coefficients in a nicer way.
-        :return: A string to display.
-        """
-        prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
-        basestr = ("\n**************************************************************************\n"
-                   "Outcome = {} \n"
-                   "Logistic Regression Summary\n\n{}\n\n"
-                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
-                                               self.model_summary().to_string(float_format=float_format),
-                                               self.coeff_summary().to_string(float_format=float_format)))
         return basestr
 
     def __str__(self):
@@ -1244,7 +1277,6 @@ class DirectEffectModel(object):
         sig_region = find_significance_region(self._direct_effect_at, mod_symb, modval_min, modval_max,
                                               other_modval_symb, atol=atol, rtol=rtol)
         return sig_region
-
 
     def _direct_effect_at(self, mod_dict):
         """
@@ -1368,7 +1400,8 @@ class BaseFloodlightAnalysis:
         ret_str += "\n----------------------------------- Analysis Details -----------------------------------\n\n"
         if effect_label == "indirect":
             ret_str += f"Mediator:\n    {self.med_name}\n\n"
-        ret_str += f"Focal Moderator:\n    {mod_name}, Range = [{modval_min:.{prec_format}}, {modval_max:.{prec_format}}]\n\n"
+        ret_str += f"Focal Moderator:\n    {mod_name}, Range = "
+        ret_str += f"[{modval_min:.{prec_format}}, {modval_max:.{prec_format}}]\n\n"
 
         if other_modval_name:
             ret_str += "Spotlight value for other moderators:\n"
@@ -1383,17 +1416,20 @@ class BaseFloodlightAnalysis:
         if sig_regions == [[], []]:
             ret_str += f"The {effect_label} effect is never significant on the range."
         else:
-            if sig_regions[0] != []:
+            if sig_regions[0]:
                 lb, ub = sig_regions[0]
-                ret_str += f"The {effect_label} effect is significantly negative on the interval [{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
-            if sig_regions[1] != []:
+                ret_str += f"The {effect_label} effect is significantly negative on the interval "
+                ret_str += f"[{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
+            if sig_regions[1]:
                 lb, ub = sig_regions[1]
-                ret_str += f"The {effect_label} effect is significantly positive on the interval [{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
+                ret_str += f"The {effect_label} effect is significantly positive on the interval "
+                ret_str += f"[{lb:.{prec_format}}, {ub:.{prec_format}}]\n"
         ret_str += """\n\n****************************************************************************************\n"""
         return ret_str
 
     def get_significance_regions(self):
         return {"Negative on": self.sig_regions[0], "Positive on": self.sig_regions[1]}
+
 
 class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
     def __init__(self, mod_name, sig_regions, modval_range, other_modval_name, precision):
@@ -1412,6 +1448,7 @@ class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
         """
         super().__init__(None, mod_name, sig_regions, modval_range, other_modval_name, precision)
 
+
 class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
     def __init__(self, med_name, mod_name, sig_regions, modval_range, other_modval_name, precision):
         """
@@ -1428,3 +1465,4 @@ class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
             The decimal precision at which to display the results.
         """
         super().__init__(med_name, mod_name, sig_regions, modval_range, other_modval_name, precision)
+        print(self.__class__.__bases__)

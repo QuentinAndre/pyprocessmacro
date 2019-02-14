@@ -1,12 +1,14 @@
-from numpy.linalg import inv, LinAlgError
-from numpy import dot
-from scipy.stats import norm
-import numpy as np
+# -*- coding: utf-8 -*-
+
 import matplotlib.pyplot as plt
-import re
+import numpy as np
+from numpy import dot
+from numpy.linalg import inv, LinAlgError
+from scipy.stats import norm
+from seaborn import FacetGrid
 
 
-def z_score(conf: float) -> float:
+def z_score(conf):
     """
     :param conf: Desired level of confidence
     :return: The Z-score corresponding to the level of confidence desired.
@@ -14,7 +16,7 @@ def z_score(conf: float) -> float:
     return norm.ppf((100 - (100 - conf) / 2) / 100)
 
 
-def bias_corrected_ci(estimate: np.array, samples: np.array, conf: float = 95) -> (float, float):
+def bias_corrected_ci(estimate, samples, conf=95):
     """
     Return the bias-corrected bootstrap confidence interval for an estimate
     :param estimate: Numerical estimate in the original sample
@@ -22,6 +24,7 @@ def bias_corrected_ci(estimate: np.array, samples: np.array, conf: float = 95) -
     :param conf: Level of the desired confidence interval
     :return: Bias-corrected bootstrapped LLCI and ULCI for the estimate.
     """
+    # noinspection PyUnresolvedReferences
     ptilde = ((samples < estimate) * 1).mean()
     Z = norm.ppf(ptilde)
     Zci = z_score(conf)
@@ -32,7 +35,7 @@ def bias_corrected_ci(estimate: np.array, samples: np.array, conf: float = 95) -
     return llci, ulci
 
 
-def percentile_ci(samples: np.array, conf=95) -> np.array:
+def percentile_ci(samples, conf):
     """
     Based on an array of values, returns the lower and upper percentile bound for a desired level of confidence
     :param samples: NxK array of samples
@@ -44,7 +47,7 @@ def percentile_ci(samples: np.array, conf=95) -> np.array:
     return np.percentile(samples, [lower, upper])
 
 
-def fast_OLS(endog: np.array, exog: np.array) -> np.array:
+def fast_OLS(endog, exog):
     """
     A simple function for (X'X)^(-1)X'Y
     :return: The Kx1 array of estimated coefficients.
@@ -69,7 +72,7 @@ def logit_cdf(X):
     return out
 
 
-def logit_score(endog: np.array, exog: np.array, params: np.array, n_obs: int) -> np.array:
+def logit_score(endog, exog, params, n_obs):
     """
     The score of the logistic function.
     :param endog: Nx1 vector of endogenous predictions
@@ -81,7 +84,7 @@ def logit_score(endog: np.array, exog: np.array, params: np.array, n_obs: int) -
     return dot(endog - logit_cdf(dot(exog, params)), exog) / n_obs
 
 
-def logit_hessian(exog: np.array, params: np.array, n_obs: int) -> np.array:
+def logit_hessian(exog, params, n_obs):
     """
     The hessian of the logistic function.
     :param exog: NxK vector of exogenous predictors
@@ -93,8 +96,7 @@ def logit_hessian(exog: np.array, params: np.array, n_obs: int) -> np.array:
     return -dot(L * (1 - L) * exog.T, exog) / n_obs
 
 
-def fast_optimize(endog: np.array, exog: np.array, n_obs: int = 0, n_vars: int = 0, max_iter: int = 10000,
-                  tolerance: float = 1e-10):
+def fast_optimize(endog, exog, n_obs=0, n_vars=0, max_iter=10000, tolerance=1e-10):
     """
     A convenience function for the Newton-Raphson method to evaluate a logistic model.
     :param endog: Nx1 vector of endogenous predictions
@@ -119,10 +121,11 @@ def fast_optimize(endog: np.array, exog: np.array, n_obs: int = 0, n_vars: int =
     return newparams
 
 
-def bootstrap_sampler(n_obs: int, seed: int = None):
+def bootstrap_sampler(n_obs, seed=None):
     """
     A generator of bootstrapped indices. Samples with repetition a list of indices.
     :param n_obs: Number of observations
+    :param seed: The seed to use for the random number generator
     :return: Bootstrapped indices of size n_obs
     """
     seeder = np.random.RandomState(seed)
@@ -140,7 +143,7 @@ def eigvals(exog):
     return np.sort(np.linalg.eigvalsh(dot(exog.T, exog)))[::-1]
 
 
-def eval_expression(expr: np.array, values: dict = None) -> np.array:
+def eval_expression(expr, values=None):
     """
     Evaluate a symbolic expression and returns a numerical array.
     :param expr: A symbolic expression to evaluate, in the form of a N_terms * N_Vars matrix
@@ -159,8 +162,29 @@ def eval_expression(expr: np.array, values: dict = None) -> np.array:
     return evaled_expr
 
 
-def plot_errorbars(x, y, yerrlow: float, yerrhigh: float, plot_kws: dict = None,
-                   err_kws: dict = None, *args, **kwargs):
+def gen_moderators(raw_equations, raw_varlist):
+    terms_y = raw_equations["all_to_y"]
+    terms_m = raw_equations["x_to_m"]
+    # Moderators of X in the path to Y
+    mod_x_direct = set(filter(lambda v: f"x*{v}" in terms_y, raw_varlist))
+
+    # Moderators of X in the path to M
+    mod_x_indirect = set(filter(lambda v: f"x*{v}" in terms_m, raw_varlist))
+
+    # Moderators of M in the path to Y
+    mod_m = set(filter(lambda v: f"m*{v}" in terms_y, raw_varlist))
+
+    moderators = {
+        "x_direct": mod_x_direct,
+        "x_indirect": mod_x_indirect,
+        "m": mod_m,
+        "all": mod_x_indirect | mod_x_direct | mod_m,
+        "indirect": mod_x_indirect | mod_m
+    }
+    return moderators
+
+
+def plot_errorbars(x, y, yerrlow, yerrhigh, plot_kws=None, err_kws=None, *args, **kwargs):
     yerr = [yerrlow, yerrhigh]
     err_kws_final = kwargs.copy()
     err_kws_final.update(err_kws)
@@ -172,8 +196,7 @@ def plot_errorbars(x, y, yerrlow: float, yerrhigh: float, plot_kws: dict = None,
     return None
 
 
-def plot_errorbands(x, y, llci: float, ulci: float, plot_kws: dict = None, err_kws: dict = None,
-                    *args, **kwargs):
+def plot_errorbands(x, y, llci, ulci, plot_kws=None, err_kws=None, *args, **kwargs):
     err_kws_final = kwargs.copy()
     err_kws_final.update(err_kws)
     err_kws_final.update({'label': ''})
@@ -184,15 +207,63 @@ def plot_errorbands(x, y, llci: float, ulci: float, plot_kws: dict = None, err_k
     return None
 
 
-def list_moderators(terms: list, of="x"):
-    """
-    :param vars: A list of regression terms
-    :param of: The variable that is moderated
-    :return: A set of all moderators of the variable "of".
-    """
-    pattern = re.compile(r"^(?:x\*)([a-z])$")
+def plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws, plot_kws,
+                             err_kws):
+    if isinstance(hue, list):
+        huename = "Hue"
+        if len(hue) == 2:
+            if hue_format is None:
+                hue_format = "{var1} at {hue1:.2f},  {var2} at {hue2:.2f}"
+            df_effects["Hue"] = df_effects[hue].apply(lambda d: hue_format.format(
+                var1=hue[0],
+                var2=hue[1],
+                hue1=d[hue[0]],
+                hue2=d[hue[1]]), axis=1)
+        else:
+            if hue_format is None:
+                hue_format = "{var1} at {hue1:.2f}"
+            df_effects["Hue"] = df_effects[hue[0]].apply(lambda d: hue_format.format(var1=hue[0], hue1=d))
+    elif isinstance(hue, str):
+        huename = "Hue"
+        if hue_format is None:
+            hue_format = "{var1} at {hue1:.2f}"
+        df_effects["Hue"] = df_effects[hue].apply(lambda d: hue_format.format(var1=hue, hue1=d))
+    else:
+        huename = None
+
+    if not facet_kws:
+        facet_kws = {}
+    if not plot_kws:
+        plot_kws = {}
+
+    g = FacetGrid(hue=huename, data=df_effects, col=col, row=row, **facet_kws)
+
+    if errstyle == "band":
+        if not err_kws:
+            err_kws = {'alpha': 0.2}
+        g.map(plot_errorbands, x, "Effect", "LLCI", "ULCI", plot_kws=plot_kws, err_kws=err_kws)
+    elif errstyle == "ci":
+        if not err_kws:
+            err_kws = {'alpha': 1,
+                       'capthick': 1,
+                       'capsize': 3}
+        df_effects["yerr_low"] = (df_effects["Effect"] - df_effects["LLCI"])
+        df_effects["yerr_high"] = (df_effects["ULCI"] - df_effects["Effect"])
+        g.map(plot_errorbars, x, "Effect", "yerr_low", "yerr_high", plot_kws=plot_kws, err_kws=err_kws)
+    elif errstyle == "none":
+        g.map(plt.plot, x, "Effect", **plot_kws)
+
+    if facet_kws.get('margin_titles'):
+        for ax in g.axes.flat:
+            plt.setp(ax.texts, text="")
+
+    if row and col:
+        g.set_titles(row_template='{row_var} at {row_name:.2f}', col_template='{col_var} at {col_name:.2f}')
+
+    return g
 
 
+# noinspection PyTypeChecker
 def find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, modval_other_symb, atol, rtol):
     mos = modval_other_symb.copy()
     dict_modval_min = {**dict([[mod_symb, modval_min]]), **mos}
@@ -207,9 +278,9 @@ def find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, m
         b_min, llci_min, ulci_min, b_max, llci_max, ulci_max = b_max, llci_max, ulci_max, b_min, llci_min, ulci_min
 
     # Cases 1 and 2: The effect is always significantly negative/positive:
-    if (ulci_max < 0):
+    if ulci_max < 0:
         return [[modval_min, modval_max], []]
-    if (llci_min > 0):
+    if llci_min > 0:
         return [[], [modval_min, modval_max]]
 
     # Case 3: The effect is negative and sig. in one region, and becomes non-significant at some critical value:
@@ -246,28 +317,27 @@ def find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, m
     # Case 6: The effect is not significant on the bounds of the region, but can still be significant in some middle
     # range:
     if (llci_min < 0 < ulci_min) and (llci_max < 0 < ulci_max):
-        return search_mid_range(spotlight_func, modval_min, modval_max, mod_symb, mos, region="positive",
-                                atol=atol, rtol=rtol)
+        return search_mid_range(spotlight_func, modval_min, modval_max, mod_symb, mos, atol=atol, rtol=rtol)
 
 
-def search_mid_range(spotlight_func, min_val, max_val, mod_symb, mod_dict,
-                     region="positive", atol=1e-8, rtol=1e-5):
-    cvals = np.linspace(min_val, max_val, 1000) # Construct a grid of 1000 points.
+def search_mid_range(spotlight_func, min_val, max_val, mod_symb, mod_dict, atol=1e-8, rtol=1e-5):
+    cvals = np.linspace(min_val, max_val, 1000)  # Construct a grid of 1000 points.
     arr_ci = np.empty((1000, 2))
-    arr_b = np.empty((1000))
+    # noinspection PyRedundantParentheses
+    arr_b = np.empty(shape=(1000))
     for i, cval in enumerate(cvals):
         mod_dict[mod_symb] = cval
         arr_b[i], _, arr_ci[i][0], arr_ci[i][1] = spotlight_func(mod_dict)
 
-    non_sig = list(map(lambda x: x[0] < 0 < x[1], arr_ci)) # Check if there is at least one point where the CI does
-                                                           # not include 0
-    if all(non_sig): # If not, no significant region.
+    non_sig = list(map(lambda x: x[0] < 0 < x[1], arr_ci))  # Check if there is at least one point where the CI does
+    # not include 0
+    if all(non_sig):  # If not, no significant region.
         return [[], []]
 
     # Otherwise, we identify the effect at the point at which the CI is the most narrow.
     effect_at_tightest_ci = arr_b[np.argmin(arr_ci[:, 1] - arr_ci[:, 0])]
 
-    if effect_at_tightest_ci > 0: # Significance region will be positive
+    if effect_at_tightest_ci > 0:  # Significance region will be positive
         # Slope here is the slope of the CI: the slope of the effect itself is not significant.
         mid_val = cvals[np.argmax(arr_ci[:, 0])]
         lval = search_critical_values(spotlight_func, min_val, mid_val, mod_symb, mod_dict, slope="positive",
