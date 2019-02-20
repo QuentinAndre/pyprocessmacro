@@ -1,7 +1,8 @@
-from typing import Callable, Union, Mapping, Iterable, Dict, List, Optional, Any, Set
+from typing import Callable, Union, Iterable, Dict, List, Optional, Any, Set
+
+import numpy as np
 from pandas import DataFrame
 from seaborn import FacetGrid
-import numpy as np
 
 
 def z_score(

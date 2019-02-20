@@ -1,26 +1,25 @@
 # -*- coding: utf-8 -*-
-from typing import Callable, Union, Mapping, Iterable, Dict, List, Any, Set, Tuple, Optional
-from typing_extensions import Final, NoReturn
-
-from .models import OLSOutcomeModel, DirectEffectModel, ParallelMediationModel, LogitOutcomeModel, \
-    DirectFloodlightAnalysis, IndirectFloodlightAnalysis
+from typing import Union, Iterable, Dict, List, Any, Set, Tuple, Optional
 
 from numpy import (
-    float64,
     ndarray,
 )
 from pandas.core.frame import DataFrame
 from seaborn.axisgrid import FacetGrid
+from typing_extensions import NoReturn
+
+from .models import OLSOutcomeModel, DirectEffectModel, ParallelMediationModel, LogitOutcomeModel, \
+    DirectFloodlightAnalysis, IndirectFloodlightAnalysis
 
 
 class Process(object):
-    __var_kws__: Final[Set[str]]
+    __var_kws__: Set[str]
 
-    __options_kws__: Final[Set[str]]
+    __options_kws__: Set[str]
 
-    __models_vars__: Final[Dict[str, Set[str]]]
+    __models_vars__: Dict[str, Set[str]]
 
-    __models_eqs__: Final[Dict[str, Dict[List[str]]]]
+    __models_eqs__: Dict[str, Dict[List[str]]]
 
     model_num: int
     controls: Iterable
@@ -44,36 +43,36 @@ class Process(object):
     _symb_to_var: Dict[str, str]
     _symb_to_ind: Dict[str, int]
 
-
     _equations: List[Tuple[Union[str, List[str]]]]
 
-    def __init__(self,
-                 data: DataFrame,
-                 model: int,
-                 modval: Optional[Dict[str, List[float]]],
-                 cluster: Optional[str],
-                 boot: Optional[int],
-                 seed: Optional[int],
-                 mc: Optional[bool],
-                 conf: Optional[int],
-                 effsize: Optional[bool],
-                 jn: Optional[bool],
-                 hc3: Optional[bool],
-                 controls: Optional[Iterable[str]],
-                 controls_in: str,
-                 total: Optional[bool],
-                 contrast: Optional[bool],
-                 center: Optional[bool],
-                 quantile: Optional[bool],
-                 detail: Optional[bool],
-                 percent: Optional[bool],
-                 logit: Optional[bool],
-                 iterate: Optional[int],
-                 convergence: Optional[float],
-                 precision: Optional[int],
-                 suppr_init: Optional[bool],
-                 **kwargs) -> None:
-        ...
+    def __init__(
+            self,
+            data: DataFrame,
+            model: int,
+            modval: Optional[Dict[str, List[float]]],
+            cluster: Optional[str],
+            boot: Optional[int],
+            seed: Optional[int],
+            mc: Optional[bool],
+            conf: Optional[int],
+            effsize: Optional[bool],
+            jn: Optional[bool],
+            hc3: Optional[bool],
+            controls: Optional[Iterable[str]],
+            controls_in: str,
+            total: Optional[bool],
+            contrast: Optional[bool],
+            center: Optional[bool],
+            quantile: Optional[bool],
+            detail: Optional[bool],
+            percent: Optional[bool],
+            logit: Optional[bool],
+            iterate: Optional[int],
+            convergence: Optional[float],
+            precision: Optional[int],
+            suppr_init: Optional[bool],
+            **kwargs
+    ) -> None: ...
 
     # PRIVATE METHODS
     def _gen_valid_options(

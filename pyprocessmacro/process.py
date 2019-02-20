@@ -3,8 +3,9 @@ import copy
 import warnings
 from itertools import product
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from .models import OLSOutcomeModel, DirectEffectModel, ParallelMediationModel, LogitOutcomeModel, \
     DirectFloodlightAnalysis, IndirectFloodlightAnalysis
 from .utils import plot_conditional_effects, gen_moderators
