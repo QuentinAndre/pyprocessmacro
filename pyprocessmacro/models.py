@@ -9,8 +9,16 @@ import scipy.stats as stats
 from numpy import dot
 from numpy.linalg import inv, LinAlgError
 
-from .utils import fast_OLS, fast_optimize, bootstrap_sampler, eval_expression, bias_corrected_ci, z_score, \
-    percentile_ci, find_significance_region
+from .utils import (
+    fast_OLS,
+    fast_optimize,
+    bootstrap_sampler,
+    eval_expression,
+    bias_corrected_ci,
+    z_score,
+    percentile_ci,
+    find_significance_region,
+)
 
 
 class BaseLogit(object):
@@ -37,7 +45,7 @@ class BaseLogit(object):
         idx = X > 0
         out = np.empty(X.size, dtype=float)
         with warnings.catch_warnings():
-            warnings.filterwarnings('error')
+            warnings.filterwarnings("error")
             try:
                 out[idx] = 1 / (1 + np.exp(-X[idx]))
                 exp_X = np.exp(X[~idx])
@@ -77,7 +85,9 @@ class BaseLogit(object):
 
         oldparams = np.inf
         newparams = np.repeat(0, self._n_vars)
-        while iterations < max_iter and np.any(np.abs(newparams - oldparams) > tolerance):
+        while iterations < max_iter and np.any(
+            np.abs(newparams - oldparams) > tolerance
+        ):
             oldparams = newparams
             H = hess(oldparams)
             newparams = oldparams - dot(inv(H), score(oldparams))
@@ -100,7 +110,9 @@ class BaseOutcomeModel(object):
     to an endogenous outcome (Y, or M).
     """
 
-    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+    def __init__(
+        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+    ):
         """
         Instantiate the model.
         :param data: np.array
@@ -186,14 +198,36 @@ class BaseOutcomeModel(object):
         if results:
             if "t" in results.keys():  # Model has t-stats rather than z-stats
                 coeffs = np.array(
-                    [results["betas"], results["se"], results["t"], results["p"], results["llci"], results["ulci"]]).T
-                df = pd.DataFrame(coeffs, index=results["names"],
-                                  columns=["coeff", "se", "t", "p", "LLCI", "ULCI"])
+                    [
+                        results["betas"],
+                        results["se"],
+                        results["t"],
+                        results["p"],
+                        results["llci"],
+                        results["ulci"],
+                    ]
+                ).T
+                df = pd.DataFrame(
+                    coeffs,
+                    index=results["names"],
+                    columns=["coeff", "se", "t", "p", "LLCI", "ULCI"],
+                )
             else:  # Model has z-stats.
                 coeffs = np.array(
-                    [results["betas"], results["se"], results["z"], results["p"], results["llci"], results["ulci"]]).T
-                df = pd.DataFrame(coeffs, index=results["names"],
-                                  columns=["coeff", "se", "Z", "p", "LLCI", "ULCI"])
+                    [
+                        results["betas"],
+                        results["se"],
+                        results["z"],
+                        results["p"],
+                        results["llci"],
+                        results["ulci"],
+                    ]
+                ).T
+                df = pd.DataFrame(
+                    coeffs,
+                    index=results["names"],
+                    columns=["coeff", "se", "Z", "p", "LLCI", "ULCI"],
+                )
         else:
             raise NotImplementedError(
                 "The model has not been estimated yet. Please estimate the model first."
@@ -209,7 +243,9 @@ class OLSOutcomeModel(BaseOutcomeModel):
     An OLS subclass for OutcomeModels. Implement methods specific to the OLS estimation.
     """
 
-    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+    def __init__(
+        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+    ):
         super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
 
     def _estimate(self):
@@ -231,25 +267,29 @@ class OLSOutcomeModel(BaseOutcomeModel):
         mse = (resid ** 2).sum() / df_e
         sse = dot(resid.T, resid) / df_e
         errortype = "standard" if self._options["hc3"] == 1 else "HC3"
-        if errortype == 'standard':
+        if errortype == "standard":
             vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
-        elif errortype == 'HC0':
+        elif errortype == "HC0":
             sq_resid = (resid ** 2).squeeze()
             vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
-        elif errortype == 'HC1':
+        elif errortype == "HC1":
             sq_resid = (resid ** 2).squeeze()
-            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
-        elif errortype == 'HC2':
+            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(
+                dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx
+            )
+        elif errortype == "HC2":
             sq_resid = (resid ** 2).squeeze()
             H = (x.dot(inv_xx) * x).sum(axis=-1)
             vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / (1 - H)), x), inv_xx)
-        elif errortype == 'HC3':
+        elif errortype == "HC3":
             sq_resid = (resid ** 2).squeeze()
             H = (x.dot(inv_xx) * x).sum(axis=-1)
             vcv = dot(dot(dot(inv_xx, x.T) * (sq_resid / ((1 - H) ** 2)), x), inv_xx)
         else:
-            raise ValueError("The covariance type {} is not supported. Please specify 'standard', 'HC0'"
-                             "'HC1', 'HC2', or 'HC3".format(errortype))
+            raise ValueError(
+                "The covariance type {} is not supported. Please specify 'standard', 'HC0'"
+                "'HC1', 'HC2', or 'HC3".format(errortype)
+            )
 
         betas = betas.squeeze()
         se = np.sqrt(np.diagonal(vcv)).squeeze()
@@ -264,23 +304,25 @@ class OLSOutcomeModel(BaseOutcomeModel):
         llci = betas - (se * zscore)
         ulci = betas + (se * zscore)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
-        estimation_results = {"betas": betas,
-                              "se": se,
-                              "vcv": vcv,
-                              "t": t,
-                              "p": p,
-                              "R2": R2,
-                              "adjR2": adjR2,
-                              "df_e": int(df_e),
-                              "df_r": int(df_r),
-                              "mse": mse,
-                              "F": F,
-                              "sse": sse,
-                              "F_pval": F_pval,
-                              "llci": llci,
-                              "ulci": ulci,
-                              "names": names,
-                              "n": int(n_obs)}
+        estimation_results = {
+            "betas": betas,
+            "se": se,
+            "vcv": vcv,
+            "t": t,
+            "p": p,
+            "R2": R2,
+            "adjR2": adjR2,
+            "df_e": int(df_e),
+            "df_r": int(df_r),
+            "mse": mse,
+            "F": F,
+            "sse": sse,
+            "F_pval": F_pval,
+            "llci": llci,
+            "ulci": ulci,
+            "names": names,
+            "n": int(n_obs),
+        }
         return estimation_results
 
     def model_summary(self):
@@ -291,7 +333,11 @@ class OLSOutcomeModel(BaseOutcomeModel):
         results = self.estimation_results
         statistics = ["R2", "adjR2", "mse", "F", "df_r", "df_e", "F_pval"]
         row = [[results[s] for s in statistics]]
-        df = pd.DataFrame(row, index=[""], columns=["R²", "Adj. R²", "MSE", "F", "df1", "df2", "p-value"])
+        df = pd.DataFrame(
+            row,
+            index=[""],
+            columns=["R²", "Adj. R²", "MSE", "F", "df1", "df2", "p-value"],
+        )
         return df
 
     def coeff_summary(self):
@@ -307,12 +353,16 @@ class OLSOutcomeModel(BaseOutcomeModel):
         :return: A string to display.
         """
         prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
-        basestr = ("Outcome = {} \n"
-                   "OLS Regression Summary\n\n{}\n\n"
-                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
-                                               self.model_summary().to_string(float_format=float_format),
-                                               self.coeff_summary().to_string(float_format=float_format)))
+        float_format = partial("{:.{prec}f}".format, prec=prec)
+        basestr = (
+            "Outcome = {} \n"
+            "OLS Regression Summary\n\n{}\n\n"
+            "Coefficients\n\n{}".format(
+                self._symb_to_var[self._endogvar],
+                self.model_summary().to_string(float_format=float_format),
+                self.coeff_summary().to_string(float_format=float_format),
+            )
+        )
         return basestr
 
     def __str__(self):
@@ -324,7 +374,9 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
     A Logit subclass for OutcomeModels. Implement methods specific to the Logistic estimation.
     """
 
-    def __init__(self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None):
+    def __init__(
+        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+    ):
         super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
 
     def _estimate(self):
@@ -360,21 +412,23 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         coxsnell = 1 - (lnull / lmodel) ** (2 / self._n_obs)
         nagelkerke = coxsnell / (1 - lnull ** (2 / self._n_obs))
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
-        estimation_results = {"betas": betas,
-                              "se": se,
-                              "vcv": vcv,
-                              "z": z,
-                              "p": p,
-                              "llci": llci,
-                              "ulci": ulci,
-                              "mcfadden": mcfadden,
-                              "coxsnell": coxsnell,
-                              "nagelkerke": nagelkerke,
-                              "d": d,
-                              "minus2ll": minus2ll,
-                              "pvalue": pvalue,
-                              "n": int(self._n_obs),
-                              "names": names}
+        estimation_results = {
+            "betas": betas,
+            "se": se,
+            "vcv": vcv,
+            "z": z,
+            "p": p,
+            "llci": llci,
+            "ulci": ulci,
+            "mcfadden": mcfadden,
+            "coxsnell": coxsnell,
+            "nagelkerke": nagelkerke,
+            "d": d,
+            "minus2ll": minus2ll,
+            "pvalue": pvalue,
+            "n": int(self._n_obs),
+            "names": names,
+        }
         return estimation_results
 
     def model_summary(self):
@@ -383,9 +437,33 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         :return: A DataFrame of model statistics
         """
         results = self.estimation_results
-        row = [[results[i] for i in ["minus2ll", "d", "pvalue", "mcfadden", "coxsnell", "nagelkerke", "n"]]]
-        return pd.DataFrame(row, index=[""],
-                            columns=["-2LL", "Model LL", "p-value", "McFadden", "Cox-Snell", "Nagelkerke", "n"])
+        row = [
+            [
+                results[i]
+                for i in [
+                    "minus2ll",
+                    "d",
+                    "pvalue",
+                    "mcfadden",
+                    "coxsnell",
+                    "nagelkerke",
+                    "n",
+                ]
+            ]
+        ]
+        return pd.DataFrame(
+            row,
+            index=[""],
+            columns=[
+                "-2LL",
+                "Model LL",
+                "p-value",
+                "McFadden",
+                "Cox-Snell",
+                "Nagelkerke",
+                "n",
+            ],
+        )
 
     def coeff_summary(self):
         """
@@ -400,13 +478,17 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         :return: A string to display.
         """
         prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
-        basestr = ("\n**************************************************************************\n"
-                   "Outcome = {} \n"
-                   "Logistic Regression Summary\n\n{}\n\n"
-                   "Coefficients\n\n{}".format(self._symb_to_var[self._endogvar],
-                                               self.model_summary().to_string(float_format=float_format),
-                                               self.coeff_summary().to_string(float_format=float_format)))
+        float_format = partial("{:.{prec}f}".format, prec=prec)
+        basestr = (
+            "\n**************************************************************************\n"
+            "Outcome = {} \n"
+            "Logistic Regression Summary\n\n{}\n\n"
+            "Coefficients\n\n{}".format(
+                self._symb_to_var[self._endogvar],
+                self.model_summary().to_string(float_format=float_format),
+                self.coeff_summary().to_string(float_format=float_format),
+            )
+        )
         return basestr
 
     def __str__(self):
@@ -419,8 +501,19 @@ class ParallelMediationModel(object):
     set of exogenous predictors for the endogenous variable and the mediators.
     """
 
-    def __init__(self, data, exog_terms_y, exog_terms_m, mod_symb, spot_values,
-                 n_meds, analysis_list, symb_to_ind, symb_to_var, options=None):
+    def __init__(
+        self,
+        data,
+        exog_terms_y,
+        exog_terms_m,
+        mod_symb,
+        spot_values,
+        n_meds,
+        analysis_list,
+        symb_to_ind,
+        symb_to_var,
+        options=None,
+    ):
         """
         :param data: array
             NxK array of data
@@ -454,11 +547,15 @@ class ParallelMediationModel(object):
             options = {}
         self._options = options
 
-        self._vars_y = [i for i in self._exog_terms_y if (("*" not in i) & (i != "Cons"))]
+        self._vars_y = [
+            i for i in self._exog_terms_y if (("*" not in i) & (i != "Cons"))
+        ]
         self._ind_y = self._symb_to_ind["y"]
         self._exog_inds_y = [self._symb_to_ind[var] for var in self._exog_terms_y]
 
-        self._vars_m = [i for i in self._exog_terms_m if (("*" not in i) & (i != "Cons"))]
+        self._vars_m = [
+            i for i in self._exog_terms_m if (("*" not in i) & (i != "Cons"))
+        ]
         self._endog_vars_m = ["m{}".format(i + 1) for i in range(self._n_meds)]
         self._inds_m = [self._symb_to_ind[m] for m in self._endog_vars_m]
         self._exog_inds_m = [self._symb_to_ind[var] for var in self._exog_terms_m]
@@ -467,18 +564,27 @@ class ParallelMediationModel(object):
         if self._options["logit"]:
             max_iter = self._options["iterate"]
             tolerance = self._options["convergence"]
-            self._compute_betas_y = partial(fast_optimize, n_obs=self._n_obs, n_vars=len(self._exog_inds_y),
-                                            max_iter=max_iter, tolerance=tolerance)
+            self._compute_betas_y = partial(
+                fast_optimize,
+                n_obs=self._n_obs,
+                n_vars=len(self._exog_inds_y),
+                max_iter=max_iter,
+                tolerance=tolerance,
+            )
         else:
             self._compute_betas_y = fast_OLS
 
         self._true_betas_y, self._true_betas_m = self._estimate_true_params()
-        self._boot_betas_y, self._boot_betas_m, self._n_fail_samples = self._estimate_bootstrapped_params()
+        self._boot_betas_y, self._boot_betas_m, self._n_fail_samples = (
+            self._estimate_bootstrapped_params()
+        )
 
         self._base_derivs = self._gen_derivatives()
 
         self._moderators_symb = mod_symb
-        self._moderators_values = [spot_values.get(i, [0]) for i in self._moderators_symb]
+        self._moderators_values = [
+            spot_values.get(i, [0]) for i in self._moderators_symb
+        ]
         self._has_moderation = True if mod_symb else False
         self._analysis_list = analysis_list
         if self._has_moderation:
@@ -589,7 +695,7 @@ class ParallelMediationModel(object):
                 x_to_m[j] = [1 if var in term else 0 for term in exog_terms_m]
             else:
                 x_to_m[j] = [var if var in term else 1 for term in exog_terms_m]
-        derivs['x_to_m'] = x_to_m.T
+        derivs["x_to_m"] = x_to_m.T
 
         list_m_to_y = []
         for i in range(self._n_meds):  # For all the mediators...
@@ -604,7 +710,7 @@ class ParallelMediationModel(object):
                     m_to_y[j] = [var if var in term else 1 for term in exog_terms_y]
             list_m_to_y.append(m_to_y.T)
 
-        derivs['m_to_y'] = list_m_to_y
+        derivs["m_to_y"] = list_m_to_y
         return derivs
 
     def _indirect_effect_at(self, med_index, mod_dict):
@@ -632,8 +738,12 @@ class ParallelMediationModel(object):
         expr_m_to_y = eval_expression(der_m_to_y, mod_dict)
 
         # Generation of the effects and bootstrapped effects: product of m_der and y_der
-        e = dot(self._true_betas_y, expr_m_to_y) * dot(self._true_betas_m[med_index], expr_x_to_m)
-        be = dot(self._boot_betas_y, expr_m_to_y) * dot(self._boot_betas_m[med_index], expr_x_to_m)
+        e = dot(self._true_betas_y, expr_m_to_y) * dot(
+            self._true_betas_m[med_index], expr_x_to_m
+        )
+        be = dot(self._boot_betas_y, expr_m_to_y) * dot(
+            self._boot_betas_m[med_index], expr_x_to_m
+        )
         se = be.std(ddof=1)
         if self._options["percent"]:
             llci, ulci = percentile_ci(be, conf)
@@ -667,7 +777,9 @@ class ParallelMediationModel(object):
 
         for i, vals in enumerate(mod_values):
             mod_dict = {k: v for k, v in zip(mod_symb, vals)}
-            e[i], be[i], se[i], llci[i], ulci[i] = self._indirect_effect_at(med_index, mod_dict)
+            e[i], be[i], se[i], llci[i], ulci[i] = self._indirect_effect_at(
+                med_index, mod_dict
+            )
 
         return e, be, se, llci, ulci
 
@@ -749,7 +861,9 @@ class ParallelMediationModel(object):
         effects, se, llci, ulci = np.empty((4, self._n_meds, n_cond_effects))
 
         for i in range(self._n_meds):
-            effects[i], _, se[i], llci[i], ulci[i] = self._get_conditional_indirect_effects(i, mod_symb, mod_values)
+            effects[i], _, se[i], llci[i], ulci[
+                i
+            ] = self._get_conditional_indirect_effects(i, mod_symb, mod_values)
 
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
@@ -762,7 +876,9 @@ class ParallelMediationModel(object):
         moderator on the indirect effect).
         """
         if "MM" not in self._analysis_list:
-            raise ValueError("This model does not report the Index for Moderated Mediation.")
+            raise ValueError(
+                "This model does not report the Index for Moderated Mediation."
+            )
 
         conf = self._options["conf"]
         n_boots = self._options["boot"]
@@ -770,7 +886,10 @@ class ParallelMediationModel(object):
 
         # noinspection PyTypeChecker
         dict_baseline = dict([[mod, 0]])  # Only moderator at 0
-        e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        e_baseline, be_baseline = (
+            np.empty(self._n_meds),
+            np.empty((self._n_meds, n_boots)),
+        )
 
         # noinspection PyTypeChecker
         dict_effect = dict([[mod, 1]])  # Only moderator at 1
@@ -779,7 +898,9 @@ class ParallelMediationModel(object):
         effects, se, llci, ulci = np.empty((4, self._n_meds))
 
         for i in range(self._n_meds):  # ... For all the mediators
-            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
+            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(
+                i, dict_baseline
+            )
             e_effect[i], be_effect[i], *_ = self._indirect_effect_at(i, dict_effect)
 
             e_mm = e_effect[i] - e_baseline[i]  # Moderator at 1 vs. Moderator at 0
@@ -804,7 +925,9 @@ class ParallelMediationModel(object):
         moderator on the indirect effect), conditional on a value of zero for the other moderator.
         """
         if "PMM" not in self._analysis_list:
-            raise ValueError("This model does not report the Index for Partial Moderated Mediation.")
+            raise ValueError(
+                "This model does not report the Index for Partial Moderated Mediation."
+            )
 
         conf = self._options["conf"]
         n_boots = self._options["boot"]
@@ -812,7 +935,10 @@ class ParallelMediationModel(object):
 
         # noinspection PyTypeChecker
         dict_baseline = dict([[mod1, 0], [mod2, 0]])
-        e_baseline, be_baseline = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        e_baseline, be_baseline = (
+            np.empty(self._n_meds),
+            np.empty((self._n_meds, n_boots)),
+        )
 
         # noinspection PyTypeChecker
         dict_mod1 = dict([[mod1, 1], [mod2, 0]])
@@ -824,12 +950,18 @@ class ParallelMediationModel(object):
 
         effects, se, llci, ulci = np.empty((4, 2, self._n_meds))
         for i in range(self._n_meds):
-            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(i, dict_baseline)
+            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(
+                i, dict_baseline
+            )
             e_mod1[i], be_mod1[i], *_ = self._indirect_effect_at(i, dict_mod1)
             e_mod2[i], be_mod2[i], *_ = self._indirect_effect_at(i, dict_mod2)
 
-            e_pmm1 = e_mod1[i] - e_baseline[i]  # Effect of Moderator1 at 1 vs. Moderator1 at 0
-            e_pmm2 = e_mod2[i] - e_baseline[i]  # Effect of Moderator2 at 1 vs. Moderator2 at 0
+            e_pmm1 = (
+                e_mod1[i] - e_baseline[i]
+            )  # Effect of Moderator1 at 1 vs. Moderator1 at 0
+            e_pmm2 = (
+                e_mod2[i] - e_baseline[i]
+            )  # Effect of Moderator2 at 1 vs. Moderator2 at 0
 
             be_pmm1 = be_mod1[i] - be_baseline[i]  # Bootstrapped effects of...
             be_pmm2 = be_mod2[i] - be_baseline[i]
@@ -859,7 +991,9 @@ class ParallelMediationModel(object):
         moderator on the indirect effect) on the marginal impact of the other moderator.
         """
         if "MMM" not in self._analysis_list:
-            raise ValueError("This model does not report the Index for Moderated Moderated Mediation.")
+            raise ValueError(
+                "This model does not report the Index for Moderated Moderated Mediation."
+            )
 
         conf = self._options["conf"]
         n_boots = self._options["boot"]
@@ -867,15 +1001,24 @@ class ParallelMediationModel(object):
 
         # noinspection PyTypeChecker
         dict_both_on = dict([[mod1, 1], [mod2, 1]])  # Both moderators are on
-        e_both_on, be_both_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        e_both_on, be_both_on = (
+            np.empty(self._n_meds),
+            np.empty((self._n_meds, n_boots)),
+        )
 
         # noinspection PyTypeChecker
         dict_mod1_on = dict([[mod1, 2], [mod2, 0]])  # Only the first moderator is on
-        e_mod1_on, be_mod1_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        e_mod1_on, be_mod1_on = (
+            np.empty(self._n_meds),
+            np.empty((self._n_meds, n_boots)),
+        )
 
         # noinspection PyTypeChecker
         dict_mod2_on = dict([[mod1, 0], [mod2, 2]])  # Only the second moderator is on
-        e_mod2_on, be_mod2_on = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
+        e_mod2_on, be_mod2_on = (
+            np.empty(self._n_meds),
+            np.empty((self._n_meds, n_boots)),
+        )
 
         effects, se, llci, ulci = np.empty((4, 1, self._n_meds))
         for i in range(self._n_meds):
@@ -896,7 +1039,9 @@ class ParallelMediationModel(object):
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
 
-    def _floodlight_analysis(self, med_index, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5):
+    def _floodlight_analysis(
+        self, med_index, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
+    ):
         """
         Conduct a floodlight analysis of the indirect effect for a specific mediator.
         Search the critical values of mod_symb, at specific value(s) mod_dict of the other moderators.
@@ -919,8 +1064,15 @@ class ParallelMediationModel(object):
 
         spotlight_func = spotlight_wrapper(self._indirect_effect_at, med_index)
         modval_min, modval_max = modval_range
-        sig_region = find_significance_region(spotlight_func, mod_symb, modval_min, modval_max, other_modval_symb,
-                                              atol=atol, rtol=rtol)
+        sig_region = find_significance_region(
+            spotlight_func,
+            mod_symb,
+            modval_min,
+            modval_max,
+            other_modval_symb,
+            atol=atol,
+            rtol=rtol,
+        )
         return sig_region
 
     def _CMM_index(self):
@@ -931,7 +1083,9 @@ class ParallelMediationModel(object):
         moderator on the indirect effect) at various levels of the other moderator.
         """
         if "CMM" not in self._analysis_list:
-            raise ValueError("This model does not report the Index for Conditional Moderated Mediation.")
+            raise ValueError(
+                "This model does not report the Index for Conditional Moderated Mediation."
+            )
 
         conf = self._options["conf"]
         mod1, mod2 = self._moderators_symb
@@ -940,11 +1094,17 @@ class ParallelMediationModel(object):
         n_levels_mod1 = len(mod1_val)
         n_levels_mod2 = len(mod2_val)
 
-        effects_mod1, se_mod1, llci_mod1, ulci_mod1 = np.empty((4, self._n_meds, n_levels_mod1))
-        effects_mod2, se_mod2, llci_mod2, ulci_mod2 = np.empty((4, self._n_meds, n_levels_mod2))
+        effects_mod1, se_mod1, llci_mod1, ulci_mod1 = np.empty(
+            (4, self._n_meds, n_levels_mod1)
+        )
+        effects_mod2, se_mod2, llci_mod2, ulci_mod2 = np.empty(
+            (4, self._n_meds, n_levels_mod2)
+        )
 
         for i in range(self._n_meds):
-            for j, val in enumerate(mod1_val):  # Conditional moderated mediation effects for Moderator 1
+            for j, val in enumerate(
+                mod1_val
+            ):  # Conditional moderated mediation effects for Moderator 1
                 # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
                 # noinspection PyTypeChecker
@@ -959,9 +1119,13 @@ class ParallelMediationModel(object):
                 if self._options["percent"]:
                     llci_mod1[i][j], ulci_mod1[i][j] = percentile_ci(be_cmm, conf)
                 else:
-                    llci_mod1[i][j], ulci_mod1[i][j] = bias_corrected_ci(e_cmm, be_cmm, conf)
+                    llci_mod1[i][j], ulci_mod1[i][j] = bias_corrected_ci(
+                        e_cmm, be_cmm, conf
+                    )
 
-            for j, val in enumerate(mod2_val):  # Conditional moderated mediation effects for Moderator 1
+            for j, val in enumerate(
+                mod2_val
+            ):  # Conditional moderated mediation effects for Moderator 1
                 # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
                 # noinspection PyTypeChecker
@@ -976,10 +1140,16 @@ class ParallelMediationModel(object):
                 if self._options["percent"]:
                     llci_mod2[i][j], ulci_mod2[i][j] = percentile_ci(be_cmm, conf)
                 else:
-                    llci_mod2[i][j], ulci_mod2[i][j] = bias_corrected_ci(e_cmm, be_cmm, conf)
+                    llci_mod2[i][j], ulci_mod2[i][j] = bias_corrected_ci(
+                        e_cmm, be_cmm, conf
+                    )
 
-        stats_mod1 = [i.flatten() for i in [effects_mod1, se_mod1, llci_mod1, ulci_mod1]]
-        stats_mod2 = [i.flatten() for i in [effects_mod2, se_mod2, llci_mod2, ulci_mod2]]
+        stats_mod1 = [
+            i.flatten() for i in [effects_mod1, se_mod1, llci_mod1, ulci_mod1]
+        ]
+        stats_mod2 = [
+            i.flatten() for i in [effects_mod2, se_mod2, llci_mod2, ulci_mod2]
+        ]
         statistics = np.concatenate([stats_mod1, stats_mod2], axis=1)
 
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
@@ -992,15 +1162,24 @@ class ParallelMediationModel(object):
         """
         symb_to_var = self._symb_to_var
         results = self.estimation_results
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
         cols_stats = ["Effect", "Boot SE", "BootLLCI", "BootULCI"]
 
         mod_values = self._moderators_values
-        med_values = [[symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]]
+        med_values = [
+            [
+                symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+                for i in range(self._n_meds)
+            ]
+        ]
         values = med_values + mod_values
 
         rows_levels = np.array([i for i in product(*values)])
-        cols_levels = ["Mediator"] + [symb_to_var.get(x, x) for x in self._moderators_symb]
+        cols_levels = ["Mediator"] + [
+            symb_to_var.get(x, x) for x in self._moderators_symb
+        ]
 
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
@@ -1016,15 +1195,23 @@ class ParallelMediationModel(object):
         """
         symb_to_var = self._symb_to_var
         results = self.estimation_results
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
 
-        med_names = [symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]
+        med_names = [
+            symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+            for i in range(self._n_meds)
+        ]
         rows_levels = []
         if self._options["total"]:
             rows_levels += ["TOTAL"]
         rows_levels += med_names
         if self._options["contrast"]:
-            contrasts = ["Contrast: {} vs. {}".format(a, b) for a, b in combinations(med_names, 2)]
+            contrasts = [
+                "Contrast: {} vs. {}".format(a, b)
+                for a, b in combinations(med_names, 2)
+            ]
             rows_levels += contrasts
         rows_levels = np.array(rows_levels).reshape(-1, 1)
 
@@ -1042,11 +1229,18 @@ class ParallelMediationModel(object):
         """
         symb_to_var = self._symb_to_var
         results = self._MM_index()
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
         cols_stats = ["Index", "Boot SE", "LLCI", "ULCI"]
 
         mod_names = [[symb_to_var.get(i, i) for i in self._moderators_symb]]
-        med_names = [[symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]]
+        med_names = [
+            [
+                symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+                for i in range(self._n_meds)
+            ]
+        ]
         values = mod_names + med_names
         rows_levels = np.array([i for i in product(*values)])
         cols_levels = ["Moderator", "Mediator"]
@@ -1065,11 +1259,18 @@ class ParallelMediationModel(object):
         """
         symb_to_var = self._symb_to_var
         results = self._PMM_index()
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
         cols_stats = ["Index", "Boot SE", "LLCI", "ULCI"]
 
         mod_names = [[symb_to_var.get(i, i) for i in self._moderators_symb]]
-        med_names = [[symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]]
+        med_names = [
+            [
+                symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+                for i in range(self._n_meds)
+            ]
+        ]
         values = mod_names + med_names
         rows_levels = np.array([i for i in product(*values)])
         cols_levels = ["Moderator", "Mediator"]
@@ -1089,24 +1290,40 @@ class ParallelMediationModel(object):
         symb_to_var = self._symb_to_var
         results = self._CMM_index()
 
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
         cols_stats = ["Index", "Boot SE", "BootLLCI", "BootULCI"]
 
         mod1_name, mod2_name = [symb_to_var.get(i, i) for i in self._moderators_symb]
         mod1_values, mod2_values = self._moderators_values
-        med_names = [symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]
+        med_names = [
+            symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+            for i in range(self._n_meds)
+        ]
 
-        rows_modname = [mod2_name] * len(mod1_values) * self._n_meds + [mod1_name] * len(mod2_values) * self._n_meds
+        rows_modname = [mod2_name] * len(mod1_values) * self._n_meds + [
+            mod1_name
+        ] * len(mod2_values) * self._n_meds
         rows_modname = np.reshape(rows_modname, (-1, 1))
 
-        rows_medname = np.concatenate([np.repeat(med_names, len(mod1_values)), np.repeat(med_names, len(mod2_values))])
+        rows_medname = np.concatenate(
+            [
+                np.repeat(med_names, len(mod1_values)),
+                np.repeat(med_names, len(mod2_values)),
+            ]
+        )
         rows_medname = np.reshape(rows_medname, (-1, 1))
 
-        rows_modvalues = np.concatenate([np.tile(mod1_values, self._n_meds), np.tile(mod2_values, self._n_meds)])
+        rows_modvalues = np.concatenate(
+            [np.tile(mod1_values, self._n_meds), np.tile(mod2_values, self._n_meds)]
+        )
         rows_modvalues = np.reshape(rows_modvalues, (-1, 1))
 
         cols_levels = ["Focal Mod", "Mediator", "Other Mod At"]
-        rows_levels = np.concatenate([rows_modname, rows_medname, rows_modvalues], axis=1)
+        rows_levels = np.concatenate(
+            [rows_modname, rows_medname, rows_modvalues], axis=1
+        )
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
@@ -1122,10 +1339,17 @@ class ParallelMediationModel(object):
         """
         symb_to_var = self._symb_to_var
         results = self._MMM_index()
-        rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
+        rows_stats = np.array(
+            [results["effect"], results["se"], results["llci"], results["ulci"]]
+        ).T
         cols_stats = ["Index", "Boot SE", "BootLLCI", "BootULCI"]
 
-        med_names = [[symb_to_var.get('m{}'.format(i + 1), 'm{}'.format(i + 1)) for i in range(self._n_meds)]]
+        med_names = [
+            [
+                symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
+                for i in range(self._n_meds)
+            ]
+        ]
         rows_levels = np.array([i for i in product(*med_names)])
         cols_levels = ["Mediator"]
 
@@ -1139,32 +1363,44 @@ class ParallelMediationModel(object):
         if "MMM" in self._analysis_list:
             return self._MM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not report the Moderated Mediation index.")
+            raise NotImplementedError(
+                "This model does not report the Moderated Mediation index."
+            )
 
     def MMM_index_summary(self):
         if "MMM" in self._analysis_list:
             return self._MMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not report the Moderated Moderated Mediation index.")
+            raise NotImplementedError(
+                "This model does not report the Moderated Moderated Mediation index."
+            )
 
     def PMM_index_summary(self):
         if "PMM" in self._analysis_list:
             return self._PMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not report the Partial Moderated Mediation index.")
+            raise NotImplementedError(
+                "This model does not report the Partial Moderated Mediation index."
+            )
 
     def CMM_index_summary(self):
         if "CMM" in self._analysis_list:
             return self._CMM_index_wrapper()
         else:
-            raise NotImplementedError("This model does not report the Conditional Moderated Mediation index.")
+            raise NotImplementedError(
+                "This model does not report the Conditional Moderated Mediation index."
+            )
 
     def coeff_summary(self):
         """
         Get the summary of the indirect effect(s).
         :return: The appropriate moderated/unmoderated effect(s).
         """
-        return self._cond_ind_effects_wrapper() if self._has_moderation else self._simple_ind_effects_wrapper()
+        return (
+            self._cond_ind_effects_wrapper()
+            if self._has_moderation
+            else self._simple_ind_effects_wrapper()
+        )
 
     def summary(self):
         """
@@ -1172,25 +1408,38 @@ class ParallelMediationModel(object):
         :return: A string to display.
         """
         prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
-        analysis_func = {"MM": ('MODERATED MEDIATION', self._MM_index_wrapper),
-                         "PMM": ('PARTIAL MODERATED MEDIATION', self._PMM_index_wrapper),
-                         "MMM": ('MODERATED MODERATED MEDIATION', self._MMM_index_wrapper),
-                         "CMM": ('CONDITIONAL MODERATED MEDIATION', self._CMM_index_wrapper)}
+        float_format = partial("{:.{prec}f}".format, prec=prec)
+        analysis_func = {
+            "MM": ("MODERATED MEDIATION", self._MM_index_wrapper),
+            "PMM": ("PARTIAL MODERATED MEDIATION", self._PMM_index_wrapper),
+            "MMM": ("MODERATED MODERATED MEDIATION", self._MMM_index_wrapper),
+            "CMM": ("CONDITIONAL MODERATED MEDIATION", self._CMM_index_wrapper),
+        }
         symb_to_var = self._symb_to_var
         if self._has_moderation:
-            basestr = "Conditional indirect effect(s) of {x} on {y} at values of the moderator(s):\n\n" \
-                      "{coeffs}\n\n".format(x=symb_to_var["x"], y=symb_to_var["y"],
-                                            coeffs=self.coeff_summary().to_string(float_format=float_format))
+            basestr = (
+                "Conditional indirect effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                "{coeffs}\n\n".format(
+                    x=symb_to_var["x"],
+                    y=symb_to_var["y"],
+                    coeffs=self.coeff_summary().to_string(float_format=float_format),
+                )
+            )
         else:
-            basestr = "Indirect effect of {x} on {y}:\n\n" \
-                      "{coeffs}\n\n".format(x=symb_to_var["x"], y=symb_to_var["y"],
-                                            coeffs=self.coeff_summary().to_string(float_format=float_format))
+            basestr = "Indirect effect of {x} on {y}:\n\n" "{coeffs}\n\n".format(
+                x=symb_to_var["x"],
+                y=symb_to_var["y"],
+                coeffs=self.coeff_summary().to_string(float_format=float_format),
+            )
         for a in self._analysis_list:
             name, get_results = analysis_func[a]
             results = get_results()
-            basestr += "**************** INDEX OF {name} ******************\n\n" \
-                       "{results}\n\n".format(name=name, results=results.to_string(float_format=float_format))
+            basestr += (
+                "**************** INDEX OF {name} ******************\n\n"
+                "{results}\n\n".format(
+                    name=name, results=results.to_string(float_format=float_format)
+                )
+            )
         return basestr
 
     def __str__(self):
@@ -1198,7 +1447,9 @@ class ParallelMediationModel(object):
 
 
 class DirectEffectModel(object):
-    def __init__(self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None):
+    def __init__(
+        self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None
+    ):
         """
         A container for the direct effect of the variable X on the outcome Y. If the model includes one or several
         moderators of X, this container returns the conditional direct effects.
@@ -1217,7 +1468,9 @@ class DirectEffectModel(object):
         self._derivative = self._model._derivative
         self._has_mediation = has_mediation
         self._moderators_symb = mod_symb
-        self._moderators_values = [spot_values.get(i, [0]) for i in self._moderators_symb]
+        self._moderators_values = [
+            spot_values.get(i, [0]) for i in self._moderators_symb
+        ]
         self._has_moderation = True if self._moderators_symb else False
         if not options:
             options = {}
@@ -1232,19 +1485,23 @@ class DirectEffectModel(object):
         """
         mod_values = [i for i in product(*self._moderators_values)]
         mod_symb = self._moderators_symb
-        betas, se, llci, ulci = self._get_conditional_direct_effects(mod_symb, mod_values)
+        betas, se, llci, ulci = self._get_conditional_direct_effects(
+            mod_symb, mod_values
+        )
         t = betas / se
         if self._is_logit:
             p = stats.norm.sf(np.abs(t)) * 2
         else:
             df_e = self._model.estimation_results["df_e"]
             p = stats.t.sf(np.abs(t), df_e) * 2
-        estimation_results = {"betas": betas,
-                              "se": se,
-                              "t": t,
-                              "p": p,
-                              "llci": llci,
-                              "ulci": ulci}
+        estimation_results = {
+            "betas": betas,
+            "se": se,
+            "t": t,
+            "p": p,
+            "llci": llci,
+            "ulci": ulci,
+        }
         return estimation_results
 
     def _get_conditional_direct_effects(self, mod_symb, mod_values):
@@ -1257,12 +1514,16 @@ class DirectEffectModel(object):
         :return:
         """
         betas, se, llci, ulci = np.zeros((4, len(mod_values)))
-        for i, val in enumerate(mod_values):  # All possible products of level(s) of moderator(s)
+        for i, val in enumerate(
+            mod_values
+        ):  # All possible products of level(s) of moderator(s)
             mod_dict = {n: v for n, v in zip(mod_symb, val)}
             betas[i], se[i], llci[i], ulci[i] = self._direct_effect_at(mod_dict)
         return betas, se, llci, ulci
 
-    def _floodlight_analysis(self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5):
+    def _floodlight_analysis(
+        self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
+    ):
         """
         Conduct a floodlight analysis of the direct effect. Search the critical values of mod_symb,
         at specific value(s) mod_dict of the other moderators.
@@ -1274,8 +1535,15 @@ class DirectEffectModel(object):
             A mod_symb:mod_value dictionary of values for the other moderators of the direct path.
         """
         modval_min, modval_max = modval_range
-        sig_region = find_significance_region(self._direct_effect_at, mod_symb, modval_min, modval_max,
-                                              other_modval_symb, atol=atol, rtol=rtol)
+        sig_region = find_significance_region(
+            self._direct_effect_at,
+            mod_symb,
+            modval_min,
+            modval_max,
+            other_modval_symb,
+            atol=atol,
+            rtol=rtol,
+        )
         return sig_region
 
     def _direct_effect_at(self, mod_dict):
@@ -1296,9 +1564,13 @@ class DirectEffectModel(object):
         b = self._model.estimation_results["betas"]
         vcv = self._model.estimation_results["vcv"]
         deriv = self._derivative
-        grad = eval_expression(deriv, mod_dict)  # Gradient at level(s) of the moderator(s)
+        grad = eval_expression(
+            deriv, mod_dict
+        )  # Gradient at level(s) of the moderator(s)
         betas = dot(grad, b)  # Estimate is dot product of gradient and coefficients
-        var = dot(dot(grad, vcv), np.transpose(grad))  # V(Grad(X)) = Grad(X).V(X).Grad'(X)
+        var = dot(
+            dot(grad, vcv), np.transpose(grad)
+        )  # V(Grad(X)) = Grad(X).V(X).Grad'(X)
         se = np.sqrt(var)
         zscore = z_score(conf)
         llci = betas - (se * zscore)
@@ -1314,8 +1586,14 @@ class DirectEffectModel(object):
         if self._estimation_results:
             symb_to_var = self._symb_to_var
             results = self._estimation_results
-            statistics = [results["betas"], results["se"], results["t"], results["p"], results["llci"],
-                          results["ulci"]]
+            statistics = [
+                results["betas"],
+                results["se"],
+                results["t"],
+                results["p"],
+                results["llci"],
+                results["ulci"],
+            ]
             coeffs_rows = np.array([i.flatten() for i in statistics]).T
             if self._is_logit:
                 coeffs_columns = ["Effect", "SE", "Z", "p", "LLCI", "ULCI"]
@@ -1328,7 +1606,9 @@ class DirectEffectModel(object):
             df = pd.DataFrame(rows, columns=columns, index=[""] * rows.shape[0])
             return df
         else:
-            raise NotImplementedError("The model has not been estimated yet. Please estimate the model first.")
+            raise NotImplementedError(
+                "The model has not been estimated yet. Please estimate the model first."
+            )
 
     def summary(self):
         """
@@ -1338,20 +1618,34 @@ class DirectEffectModel(object):
         """
         symb_to_var = self._symb_to_var
         prec = self._options["precision"]
-        float_format = partial('{:.{prec}f}'.format, prec=prec)
+        float_format = partial("{:.{prec}f}".format, prec=prec)
         if self._has_mediation:
             if self._has_moderation:
-                basestr = "Conditional direct effect(s) of {x} on {y} at values of the moderator(s):\n\n" \
-                          "{coeffs}\n".format(x=symb_to_var["x"], y=symb_to_var["y"],
-                                              coeffs=self.coeff_summary().to_string(float_format=float_format))
+                basestr = (
+                    "Conditional direct effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                    "{coeffs}\n".format(
+                        x=symb_to_var["x"],
+                        y=symb_to_var["y"],
+                        coeffs=self.coeff_summary().to_string(
+                            float_format=float_format
+                        ),
+                    )
+                )
             else:
-                basestr = "Direct effect of {x} on {y}:\n\n" \
-                          "{coeffs}\n".format(x=symb_to_var["x"], y=symb_to_var["y"],
-                                              coeffs=self.coeff_summary().to_string(float_format=float_format))
+                basestr = "Direct effect of {x} on {y}:\n\n" "{coeffs}\n".format(
+                    x=symb_to_var["x"],
+                    y=symb_to_var["y"],
+                    coeffs=self.coeff_summary().to_string(float_format=float_format),
+                )
         else:
-            basestr = "Conditional effect(s) of {x} on {y} at values of the moderator(s):\n\n" \
-                      "{coeffs}\n".format(x=symb_to_var["x"], y=symb_to_var["y"],
-                                          coeffs=self.coeff_summary().to_string(float_format=float_format))
+            basestr = (
+                "Conditional effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                "{coeffs}\n".format(
+                    x=symb_to_var["x"],
+                    y=symb_to_var["y"],
+                    coeffs=self.coeff_summary().to_string(float_format=float_format),
+                )
+            )
         return basestr
 
     def __str__(self):
@@ -1359,8 +1653,15 @@ class DirectEffectModel(object):
 
 
 class BaseFloodlightAnalysis:
-
-    def __init__(self, med_name, mod_name, sig_regions, modval_range, other_modval_name, precision):
+    def __init__(
+        self,
+        med_name,
+        mod_name,
+        sig_regions,
+        modval_range,
+        other_modval_name,
+        precision,
+    ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
         :param mod_name: string
@@ -1432,7 +1733,9 @@ class BaseFloodlightAnalysis:
 
 
 class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
-    def __init__(self, mod_name, sig_regions, modval_range, other_modval_name, precision):
+    def __init__(
+        self, mod_name, sig_regions, modval_range, other_modval_name, precision
+    ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
         :param mod_name: string
@@ -1446,11 +1749,21 @@ class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
         :param precision: int
             The decimal precision at which to display the results.
         """
-        super().__init__(None, mod_name, sig_regions, modval_range, other_modval_name, precision)
+        super().__init__(
+            None, mod_name, sig_regions, modval_range, other_modval_name, precision
+        )
 
 
 class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
-    def __init__(self, med_name, mod_name, sig_regions, modval_range, other_modval_name, precision):
+    def __init__(
+        self,
+        med_name,
+        mod_name,
+        sig_regions,
+        modval_range,
+        other_modval_name,
+        precision,
+    ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
         :param mod_name: string
@@ -1464,5 +1777,7 @@ class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
         :param precision: int
             The decimal precision at which to display the results.
         """
-        super().__init__(med_name, mod_name, sig_regions, modval_range, other_modval_name, precision)
+        super().__init__(
+            med_name, mod_name, sig_regions, modval_range, other_modval_name, precision
+        )
         print(self.__class__.__bases__)

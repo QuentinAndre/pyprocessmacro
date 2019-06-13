@@ -6,8 +6,14 @@ from itertools import product
 import numpy as np
 import pandas as pd
 
-from .models import OLSOutcomeModel, DirectEffectModel, ParallelMediationModel, LogitOutcomeModel, \
-    DirectFloodlightAnalysis, IndirectFloodlightAnalysis
+from .models import (
+    OLSOutcomeModel,
+    DirectEffectModel,
+    ParallelMediationModel,
+    LogitOutcomeModel,
+    DirectFloodlightAnalysis,
+    IndirectFloodlightAnalysis,
+)
 from .utils import plot_conditional_effects, gen_moderators
 
 warnings.simplefilter("default")
@@ -16,9 +22,30 @@ warnings.simplefilter("default")
 class Process(object):
     __var_kws__ = {"x", "m", "w", "z", "v", "q", "y"}
 
-    __options_kws__ = {"cluster", "contrast", "boot", "mc", "conf", "effsize", "jn",
-                       "hc3", "controls_in", "total", "center", "quantile", "detail", "plot", "seed", "percent",
-                       "iterate", "convergence", "precision", "logit", "modval", "controls"}
+    __options_kws__ = {
+        "cluster",
+        "contrast",
+        "boot",
+        "mc",
+        "conf",
+        "effsize",
+        "jn",
+        "hc3",
+        "controls_in",
+        "total",
+        "center",
+        "quantile",
+        "detail",
+        "plot",
+        "seed",
+        "percent",
+        "iterate",
+        "convergence",
+        "precision",
+        "logit",
+        "modval",
+        "controls",
+    }
 
     __models_vars__ = {
         1: {"x", "m", "y"},
@@ -96,191 +123,462 @@ class Process(object):
         73: {"x", "m", "w", "z", "y"},
         74: {"x", "m", "y"},
         75: {"x", "m", "w", "z", "y"},
-        76: {"x", "m", "w", "z", "y"}
+        76: {"x", "m", "w", "z", "y"},
     }
 
     __models_eqs__ = {
-        1: {'all_to_y': ["x", "m", "x*m"],
-            'x_to_m': []},
-        2: {'all_to_y': ["x", "m", "w", "x*m", "x*w"],
-            'x_to_m': []},
-        3: {'all_to_y': ["x", "m", "w", "x*m", "x*w", "m*w", "x*m*w"],
-            'x_to_m': []},
-        4: {'all_to_y': ["x", "m"],
-            'x_to_m': ["x"]},
-        5: {'all_to_y': ["x", "m", "w", "x*w"],
-            'x_to_m': ["x"]},
-        6: {'all_to_y': ["x", "m"],
-            'x_to_m': ["x"]},
-        7: {'all_to_y': ["x", "m"],
-            'x_to_m': ["x", "w", "x*w"]},
-        8: {'all_to_y': ["x", "m", "w", "x*w"],
-            'x_to_m': ["x", "w", "x*w"]},
-        9: {'all_to_y': ["x", "m"],
-            'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        10: {'all_to_y': ["x", "m", "w", "z", "x*w", "x*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        11: {'all_to_y': ["x", "m"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        12: {'all_to_y': ["x", "m", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        13: {'all_to_y': ["x", "m", "w", "x*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        14: {'all_to_y': ["x", "m", "v", "m*v"],
-             'x_to_m': ["x"]},
-        15: {'all_to_y': ["x", "m", "v", "x*v", "m*v"],
-             'x_to_m': ["x"]},
-        16: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q"],
-             'x_to_m': ["x"]},
-        17: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
-             'x_to_m': ["x"]},
-        18: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x"]},
-        19: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q", "v*q", "x*v*q", "m*v*q"],
-             'x_to_m': ["x"]},
-        20: {'all_to_y': ["x", "m", "v", "q", "x*v", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x"]},
-        21: {'all_to_y': ["x", "m", "v", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        22: {'all_to_y': ["x", "m", "w", "v", "x*w", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        23: {'all_to_y': ["x", "m", "v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        24: {'all_to_y': ["x", "m", "w", "z", "v", "x*w", "x*z", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        25: {'all_to_y': ["x", "m", "v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        26: {'all_to_y': ["x", "m", "w", "z", "v", "x*w", "x*z", "m*v", "w*z", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        27: {'all_to_y': ["x", "m", "w", "v", "x*w", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        28: {'all_to_y': ["x", "m", "v", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        29: {'all_to_y': ["x", "m", "w", "v", "x*w", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        30: {'all_to_y': ["x", "m", "v", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        31: {'all_to_y': ["x", "m", "w", "z", "v", "x*w", "x*z", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        32: {'all_to_y': ["x", "m", "v", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        33: {'all_to_y': ["x", "m", "w", "z", "v", "x*w", "x*z", "x*v", "m*v", "w*z", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        34: {'all_to_y': ["x", "m", "w", "v", "x*w", "x*v", "m*v"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        35: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "x*w", ]},
-        36: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        37: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        38: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q", "v*q", "x*v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        39: {'all_to_y': ["x", "m", "v", "q", "x*v", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        40: {'all_to_y': ["x", "m", "w", "v", "q", "x*w", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        41: {'all_to_y': ["x", "m", "w", "v", "q", "x*w", "x*v", "x*q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        42: {'all_to_y': ["x", "m", "w", "v", "q", "x*w", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        43: {'all_to_y': ["x", "m", "w", "v", "q", "x*w", "x*v", "x*q", "m*v", "m*q", "v*q", "x*v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        44: {'all_to_y': ["x", "m", "w", "v", "q", "x*w", "x*v", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "x*w"]},
-        45: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        46: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        47: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        48: {'all_to_y': ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        49: {'all_to_y': ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        50: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        51: {'all_to_y': ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "m*v", "m*q", "w*z", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        52: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        53: {'all_to_y': ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "m*v", "m*q", "v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        54: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q", "v*q", "x*v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        55: {'all_to_y': ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "m*v", "m*q", "w*z", "v*q", "x*w*z",
-                          "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        56: {'all_to_y': ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q", "v*q", "x*v*q", "m*v*q"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        57: {'all_to_y': ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "x*v", "x*q", "m*v", "m*q",
-                          "w*z", "v*q", "x*v*q", "m*v*q", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        58: {'all_to_y': ["x", "m", "w", "m*w"],
-             'x_to_m': ["x", "w", "x*w"]},
-        59: {'all_to_y': ["x", "m", "w", "x*w", "m*w"],
-             'x_to_m': ["x", "w", "x*w"]},
-        60: {'all_to_y': ["x", "m", "w", "m*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        61: {'all_to_y': ["x", "m", "w", "x*w", "m*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        62: {'all_to_y': ["x", "m", "w", "z", "x*z", "m*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        63: {'all_to_y': ["x", "m", "w", "z", "x*w", "x*z", "m*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z"]},
-        64: {'all_to_y': ["x", "m", "w", "v", "m*w", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        65: {'all_to_y': ["x", "m", "w", "v", "x*w", "m*w", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        66: {'all_to_y': ["x", "m", "w", "v", "x*v", "m*w", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        67: {'all_to_y': ["x", "m", "w", "v", "x*w", "x*v", "m*w", "m*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        68: {'all_to_y': ["x", "m", "w", "m*w"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        69: {'all_to_y': ["x", "m", "w", "z", "x*w", "x*z", "m*w", "w*z", "x*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        70: {'all_to_y': ["x", "m", "w", "v", "m*w", "m*v", "w*v", "m*w*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        71: {'all_to_y': ["x", "m", "w", "v", "x*w", "x*v", "m*w", "m*v", "w*v", "x*w*v", "m*w*v"],
-             'x_to_m': ["x", "w", "x*w"]},
-        72: {'all_to_y': ["x", "m", "w", "z", "m*w", "m*z", "w*z", "m*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        73: {'all_to_y': ["x", "m", "w", "z", "x*w", "x*z", "m*w", "m*z", "w*z", "x*w*z", "m*w*z"],
-             'x_to_m': ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"]},
-        74: {'all_to_y': ["x", "m", "m*x"],
-             'x_to_m': ["x"]},
-        75: {'all_to_y': ["x", "m", "w", "z", "m*w", "m*z"],
-             'x_to_m': ["x", "w", "z", "x*z", "x*w"]},
-        76: {'all_to_y': ["x", "m", "w", "z", "x*z", "x*w", "m*w", "m*z"],
-             'x_to_m': ["x", "w", "z", "x*z", "x*w"]}
+        1: {"all_to_y": ["x", "m", "x*m"], "x_to_m": []},
+        2: {"all_to_y": ["x", "m", "w", "x*m", "x*w"], "x_to_m": []},
+        3: {"all_to_y": ["x", "m", "w", "x*m", "x*w", "m*w", "x*m*w"], "x_to_m": []},
+        4: {"all_to_y": ["x", "m"], "x_to_m": ["x"]},
+        5: {"all_to_y": ["x", "m", "w", "x*w"], "x_to_m": ["x"]},
+        6: {"all_to_y": ["x", "m"], "x_to_m": ["x"]},
+        7: {"all_to_y": ["x", "m"], "x_to_m": ["x", "w", "x*w"]},
+        8: {"all_to_y": ["x", "m", "w", "x*w"], "x_to_m": ["x", "w", "x*w"]},
+        9: {"all_to_y": ["x", "m"], "x_to_m": ["x", "w", "z", "x*w", "x*z"]},
+        10: {
+            "all_to_y": ["x", "m", "w", "z", "x*w", "x*z"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        11: {
+            "all_to_y": ["x", "m"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        12: {
+            "all_to_y": ["x", "m", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        13: {
+            "all_to_y": ["x", "m", "w", "x*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        14: {"all_to_y": ["x", "m", "v", "m*v"], "x_to_m": ["x"]},
+        15: {"all_to_y": ["x", "m", "v", "x*v", "m*v"], "x_to_m": ["x"]},
+        16: {"all_to_y": ["x", "m", "v", "q", "m*v", "m*q"], "x_to_m": ["x"]},
+        17: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
+            "x_to_m": ["x"],
+        },
+        18: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x"],
+        },
+        19: {
+            "all_to_y": [
+                "x",
+                "m",
+                "v",
+                "q",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x"],
+        },
+        20: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x"],
+        },
+        21: {"all_to_y": ["x", "m", "v", "m*v"], "x_to_m": ["x", "w", "x*w"]},
+        22: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        23: {
+            "all_to_y": ["x", "m", "v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        24: {
+            "all_to_y": ["x", "m", "w", "z", "v", "x*w", "x*z", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        25: {
+            "all_to_y": ["x", "m", "v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        26: {
+            "all_to_y": ["x", "m", "w", "z", "v", "x*w", "x*z", "m*v", "w*z", "x*w*z"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        27: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        28: {"all_to_y": ["x", "m", "v", "x*v", "m*v"], "x_to_m": ["x", "w", "x*w"]},
+        29: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "x*v", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        30: {
+            "all_to_y": ["x", "m", "v", "x*v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        31: {
+            "all_to_y": ["x", "m", "w", "z", "v", "x*w", "x*z", "x*v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        32: {
+            "all_to_y": ["x", "m", "v", "x*v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        33: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "v",
+                "x*w",
+                "x*z",
+                "x*v",
+                "m*v",
+                "w*z",
+                "x*w*z",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        34: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "x*v", "m*v"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        35: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        36: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        37: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        38: {
+            "all_to_y": [
+                "x",
+                "m",
+                "v",
+                "q",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        39: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        40: {
+            "all_to_y": ["x", "m", "w", "v", "q", "x*w", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        41: {
+            "all_to_y": ["x", "m", "w", "v", "q", "x*w", "x*v", "x*q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        42: {
+            "all_to_y": ["x", "m", "w", "v", "q", "x*w", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        43: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "v",
+                "q",
+                "x*w",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        44: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "v",
+                "q",
+                "x*w",
+                "x*v",
+                "m*v",
+                "m*q",
+                "v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        45: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        46: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        47: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        48: {
+            "all_to_y": ["x", "m", "v", "q", "m*v", "m*q", "v*q", "m*v*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        49: {
+            "all_to_y": ["x", "m", "w", "z", "v", "q", "x*w", "x*z", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        50: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        51: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "v",
+                "q",
+                "x*w",
+                "x*z",
+                "m*v",
+                "m*q",
+                "w*z",
+                "x*w*z",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        52: {
+            "all_to_y": ["x", "m", "v", "q", "x*v", "x*q", "m*v", "m*q"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        53: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "v",
+                "q",
+                "x*w",
+                "x*z",
+                "m*v",
+                "m*q",
+                "v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        54: {
+            "all_to_y": [
+                "x",
+                "m",
+                "v",
+                "q",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        55: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "v",
+                "q",
+                "x*w",
+                "x*z",
+                "m*v",
+                "m*q",
+                "w*z",
+                "v*q",
+                "x*w*z",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        56: {
+            "all_to_y": [
+                "x",
+                "m",
+                "v",
+                "q",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        57: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "v",
+                "q",
+                "x*w",
+                "x*z",
+                "x*v",
+                "x*q",
+                "m*v",
+                "m*q",
+                "w*z",
+                "v*q",
+                "x*v*q",
+                "m*v*q",
+                "x*w*z",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        58: {"all_to_y": ["x", "m", "w", "m*w"], "x_to_m": ["x", "w", "x*w"]},
+        59: {"all_to_y": ["x", "m", "w", "x*w", "m*w"], "x_to_m": ["x", "w", "x*w"]},
+        60: {
+            "all_to_y": ["x", "m", "w", "m*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        61: {
+            "all_to_y": ["x", "m", "w", "x*w", "m*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        62: {
+            "all_to_y": ["x", "m", "w", "z", "x*z", "m*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        63: {
+            "all_to_y": ["x", "m", "w", "z", "x*w", "x*z", "m*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z"],
+        },
+        64: {
+            "all_to_y": ["x", "m", "w", "v", "m*w", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        65: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "m*w", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        66: {
+            "all_to_y": ["x", "m", "w", "v", "x*v", "m*w", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        67: {
+            "all_to_y": ["x", "m", "w", "v", "x*w", "x*v", "m*w", "m*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        68: {
+            "all_to_y": ["x", "m", "w", "m*w"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        69: {
+            "all_to_y": ["x", "m", "w", "z", "x*w", "x*z", "m*w", "w*z", "x*w*z"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        70: {
+            "all_to_y": ["x", "m", "w", "v", "m*w", "m*v", "w*v", "m*w*v"],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        71: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "v",
+                "x*w",
+                "x*v",
+                "m*w",
+                "m*v",
+                "w*v",
+                "x*w*v",
+                "m*w*v",
+            ],
+            "x_to_m": ["x", "w", "x*w"],
+        },
+        72: {
+            "all_to_y": ["x", "m", "w", "z", "m*w", "m*z", "w*z", "m*w*z"],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        73: {
+            "all_to_y": [
+                "x",
+                "m",
+                "w",
+                "z",
+                "x*w",
+                "x*z",
+                "m*w",
+                "m*z",
+                "w*z",
+                "x*w*z",
+                "m*w*z",
+            ],
+            "x_to_m": ["x", "w", "z", "x*w", "x*z", "w*z", "x*w*z"],
+        },
+        74: {"all_to_y": ["x", "m", "m*x"], "x_to_m": ["x"]},
+        75: {
+            "all_to_y": ["x", "m", "w", "z", "m*w", "m*z"],
+            "x_to_m": ["x", "w", "z", "x*z", "x*w"],
+        },
+        76: {
+            "all_to_y": ["x", "m", "w", "z", "x*z", "x*w", "m*w", "m*z"],
+            "x_to_m": ["x", "w", "z", "x*z", "x*w"],
+        },
     }
 
-    def __init__(self, data,
-                 model=3,
-                 modval=None,
-                 cluster=None,
-                 boot=5000,
-                 seed=12345,
-                 mc=None,
-                 conf=95,
-                 effsize=False,
-                 jn=False,
-                 hc3=False,
-                 controls=None,
-                 controls_in="all",
-                 total=False,
-                 contrast=False,
-                 center=False,
-                 quantile=False,
-                 detail=True,
-                 percent=False,
-                 logit=False,
-                 iterate=10000,
-                 convergence=0.00000001,
-                 precision=4,
-                 suppr_init=False,
-                 **kwargs):
+    def __init__(
+        self,
+        data,
+        model=3,
+        modval=None,
+        cluster=None,
+        boot=5000,
+        seed=12345,
+        mc=None,
+        conf=95,
+        effsize=False,
+        jn=False,
+        hc3=False,
+        controls=None,
+        controls_in="all",
+        total=False,
+        contrast=False,
+        center=False,
+        quantile=False,
+        detail=True,
+        percent=False,
+        logit=False,
+        iterate=10000,
+        convergence=0.000_000_01,
+        precision=4,
+        suppr_init=False,
+        **kwargs,
+    ):
         """
         Initialize a Process model, as defined in Andrew F. Hayes's book 'Introduction to Mediation, Moderation,
         and Conditional Process Analysis'.
@@ -345,39 +643,67 @@ class Process(object):
             The number of decimal places to display in the summary of the model results.
         """
         if kwargs.pop("mc", None):
-            warnings.warn("The argument 'mc' for Monte-Carlo simulations is not supported", DeprecationWarning)
+            warnings.warn(
+                "The argument 'mc' for Monte-Carlo simulations is not supported",
+                DeprecationWarning,
+            )
         if kwargs.pop("normal", None):
-            warnings.warn("The argument 'normal' for normal theory tests is not supported. "
-                          "Bootstrapped CI are recommended.", DeprecationWarning)
+            warnings.warn(
+                "The argument 'normal' for normal theory tests is not supported. "
+                "Bootstrapped CI are recommended.",
+                DeprecationWarning,
+            )
         if kwargs.pop("varorder", None):
-            warnings.warn("The argument 'varorder' for normal theory tests is not supported. "
-                          "Bootstrapped CI are recommended.", DeprecationWarning)
+            warnings.warn(
+                "The argument 'varorder' for normal theory tests is not supported. "
+                "Bootstrapped CI are recommended.",
+                DeprecationWarning,
+            )
         if kwargs.pop("varlist", None):
-            warnings.warn("The 'varlist' is not required. To specify controls, use the 'controls' arguments",
-                          DeprecationWarning)
+            warnings.warn(
+                "The 'varlist' is not required. To specify controls, use the 'controls' arguments",
+                DeprecationWarning,
+            )
         if kwargs.pop("coeffci", None):
-            warnings.warn("The argument 'coeffci' is not supported.", DeprecationWarning)
+            warnings.warn(
+                "The argument 'coeffci' is not supported.", DeprecationWarning
+            )
         if kwargs.pop("plot", None):
-            warnings.warn("The argument 'plot' is not supported. Check the 'plot_conditional_direct_effects() and"
-                          "'plot_conditional_indirect_effects()' methods instead.", DeprecationWarning)
+            warnings.warn(
+                "The argument 'plot' is not supported. Check the 'plot_conditional_direct_effects() and"
+                "'plot_conditional_indirect_effects()' methods instead.",
+                DeprecationWarning,
+            )
         if kwargs.pop("save", None):
-            warnings.warn("The argument 'save' is not supported. Call the 'get_bootstrap_estimates() method to recover"
-                          "the bootstrap samples instead.", DeprecationWarning)
+            warnings.warn(
+                "The argument 'save' is not supported. Call the 'get_bootstrap_estimates() method to recover"
+                "the bootstrap samples instead.",
+                DeprecationWarning,
+            )
         if kwargs.pop("effsize", None):
-            warnings.warn("The argument 'effsize' for effect sizes is not supported yet."
-                          "It is coming in future versions of PyProcessMacro.", SyntaxWarning)
+            warnings.warn(
+                "The argument 'effsize' for effect sizes is not supported yet."
+                "It is coming in future versions of PyProcessMacro.",
+                SyntaxWarning,
+            )
         if kwargs.pop("jn", None):
-            warnings.warn("The argument 'jn' for the Johnson-Neyman region of significance is not supported."
-                          "Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
-                          DeprecationWarning)
+            warnings.warn(
+                "The argument 'jn' for the Johnson-Neyman region of significance is not supported."
+                "Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
+                DeprecationWarning,
+            )
 
         if model == 6:
-            raise NotImplementedError("The model 6 for serial mediation is not supported yet."
-                                      "It is coming in future versions of PyProcessMacro.")
+            raise NotImplementedError(
+                "The model 6 for serial mediation is not supported yet."
+                "It is coming in future versions of PyProcessMacro."
+            )
 
         if not isinstance(data, pd.DataFrame):
-            raise ValueError("The variable provided for data is not a valid pd.DataFrame object. Please provide a"
-                             "valid Pandas DataFrame as the 'data' argument.")
+            raise ValueError(
+                "The variable provided for data is not a valid pd.DataFrame object. Please provide a"
+                "valid Pandas DataFrame as the 'data' argument."
+            )
         if not controls:
             controls = []
         if not modval:
@@ -419,11 +745,14 @@ class Process(object):
         self.moderators = gen_moderators(raw_equations, raw_varlist)
 
         # Generating the equations used for estimation: a list of (exog, endog) tuples.
-        self._equations = self._gen_equations(raw_equations["all_to_y"], raw_equations["x_to_m"],
-                                              controls_in=controls_in)
+        self._equations = self._gen_equations(
+            raw_equations["all_to_y"], raw_equations["x_to_m"], controls_in=controls_in
+        )
 
         # Prepare the data: drop NaN, rename the columns, add a constant, and mean-center moderators if needed.
-        self.data, self.n_obs, self.n_obs_null, self.centered_vars = self._prepare_data()
+        self.data, self.n_obs, self.n_obs_null, self.centered_vars = (
+            self._prepare_data()
+        )
 
         # Now that the data is ready, create the dictionary mapping each variable to its column index.
         self._symb_to_ind = {v: i for i, v in enumerate(self.data.columns.values)}
@@ -458,7 +787,9 @@ class Process(object):
         conf = options["conf"]
         seed = options["seed"]
         if not isinstance(conf, int) or ((conf <= 50) or (conf >= 100)):
-            errstr += "The option 'conf' must be an integer between 50 and 100, exclusive.\n"
+            errstr += (
+                "The option 'conf' must be an integer between 50 and 100, exclusive.\n"
+            )
 
         if not isinstance(seed, int) or ((seed <= 0) or (seed >= 1e9)):
             errstr += "The option 'seed' must be  an integer between 0 and 1 000 000 000, exclusive.\n"
@@ -494,9 +825,11 @@ class Process(object):
                         errstr += f"The value of {k} in the dictionary 'modval' is not a list of numbers.\n"
 
         if errstr != "":
-            raise ValueError(f"""Some errors were found in the options specified. Please correct the following error(s):
+            raise ValueError(
+                f"""Some errors were found in the options specified. Please correct the following error(s):
             {errstr}
-            """)
+            """
+            )
         return options
 
     def _gen_valid_varlist(self, var_kwargs):
@@ -514,10 +847,13 @@ class Process(object):
             if isinstance(v, str):
                 var_kwargs[k] = [v]
             if isinstance(v, list):
-                if ((k != "m") & (len(v) != 1)) or ((self.model_num <= 3) & (len(v) != 1)):
-                    raise ValueError(f"Several variable names have been specified for '{k}'. \n"
-                                     f"The Model {self.model_num} accepts only one variable for '{k}'"
-                                     )
+                if ((k != "m") & (len(v) != 1)) or (
+                    (self.model_num <= 3) & (len(v) != 1)
+                ):
+                    raise ValueError(
+                        f"Several variable names have been specified for '{k}'. \n"
+                        f"The Model {self.model_num} accepts only one variable for '{k}'"
+                    )
 
         var_kwargs_set = set(var_kwargs.keys())
         expected_var_kwargs = self.__models_vars__[self.model_num]
@@ -542,8 +878,10 @@ class Process(object):
         # Validate the presence of variables in the data.
         miss_var_names = set(varlist) - set(self.data.columns)
         if miss_var_names:
-            raise ValueError(f"""One or several of the variables supplied to the model is/are not present in the
-            DataFrame supplied. Please double check that '{", ".join(miss_var_names)}' is/are in the DataFrame.""")
+            raise ValueError(
+                f"""One or several of the variables supplied to the model is/are not present in the
+            DataFrame supplied. Please double check that '{", ".join(miss_var_names)}' is/are in the DataFrame."""
+            )
         return varlist
 
     def _gen_var_mapping(self, var_kwargs):
@@ -557,7 +895,9 @@ class Process(object):
         :return: tuple (var_to_symb, symb_to_var)
             The dictionaries mapping the variable name to their symbols, and vice versa
         """
-        var_to_symb = {"Cons": "Cons"}  # Map each variable name to its symbolic representation.
+        var_to_symb = {
+            "Cons": "Cons"
+        }  # Map each variable name to its symbolic representation.
         symb_to_var = {"Cons": "Cons"}
 
         for key, varnames in var_kwargs.items():
@@ -595,7 +935,7 @@ class Process(object):
         x_to_m_base = x_to_m.copy()
 
         eqlist = []
-        control_vars = [v for v in self._symb_to_var.keys() if v[0] == 'c']
+        control_vars = [v for v in self._symb_to_var.keys() if v[0] == "c"]
 
         if controls_in == "all":
             all_to_y_base += control_vars
@@ -622,7 +962,9 @@ class Process(object):
                         pass
 
             eqlist.append(("y", all_to_y_full))  # Full path to Y
-            eqlist += [(f"m{i + 1}", x_to_m_full) for i in range(self.n_meds)]  # Same equation for all mediators
+            eqlist += [
+                (f"m{i + 1}", x_to_m_full) for i in range(self.n_meds)
+            ]  # Same equation for all mediators
             return eqlist
 
         else:  # Serial mediators are only found in model 6
@@ -669,7 +1011,8 @@ class Process(object):
             if len(uniques) != 2:
                 raise ValueError(
                     "The dependent variable does not have exactly two distinct outcomes."
-                    "Please provide another dataset or change the 'logit' option to 0")
+                    "Please provide another dataset or change the 'logit' option to 0"
+                )
             else:
                 endog_logit = [0 if i == uniques[0] else 1 for i in endog]
             data["y"] = endog_logit
@@ -679,18 +1022,26 @@ class Process(object):
             mod_m = self.moderators["m"]
             mod_x = self.moderators["x_indirect"] | self.moderators["x_direct"]
             if mod_m:
-                centered_vars += list(mod_m) + list({c for c in data.columns if "m" in c})
+                centered_vars += list(mod_m) + list(
+                    {c for c in data.columns if "m" in c}
+                )
             if mod_x:
                 centered_vars += list(mod_x) + ["x"]
-            data.loc[:, centered_vars] = data.loc[:, centered_vars].subtract(data.loc[:, centered_vars].mean())
+            data.loc[:, centered_vars] = data.loc[:, centered_vars].subtract(
+                data.loc[:, centered_vars].mean()
+            )
 
         # Now we add the interaction columns
         eqs = self._equations
-        intterms = [term for _, eq in eqs for term in eq if "*" in term]  # All interaction terms in all equations.
+        intterms = [
+            term for _, eq in eqs for term in eq if "*" in term
+        ]  # All interaction terms in all equations.
         for term in intterms:
             termlist = term.split("*")  # List of terms in interaction
             data[term] = data.loc[:, termlist].product(axis=1)
-            termname = "*".join([self._symb_to_var[i] for i in termlist])  # Full name of interaction
+            termname = "*".join(
+                [self._symb_to_var[i] for i in termlist]
+            )  # Full name of interaction
             self._var_to_symb[termname] = term
             self._symb_to_var[term] = termname
 
@@ -712,19 +1063,37 @@ class Process(object):
         y_endog = y_equation[0]
         y_exogs = y_equation[1]
         if self.options["logit"]:
-            model_yfull = LogitOutcomeModel(data_array, y_endog, y_exogs, self._symb_to_ind,
-                                            self._symb_to_var, self.options)
+            model_yfull = LogitOutcomeModel(
+                data_array,
+                y_endog,
+                y_exogs,
+                self._symb_to_ind,
+                self._symb_to_var,
+                self.options,
+            )
         else:
-            model_yfull = OLSOutcomeModel(data_array, y_endog, y_exogs, self._symb_to_ind,
-                                          self._symb_to_var, self.options)
+            model_yfull = OLSOutcomeModel(
+                data_array,
+                y_endog,
+                y_exogs,
+                self._symb_to_ind,
+                self._symb_to_var,
+                self.options,
+            )
         models[self.iv] = model_yfull
 
         if self.model_num > 3:  # Generating the model "Direct path to Y" (if it exists)
             for eq, med_name in zip(self._equations[1:], self.mediators):
                 m_endog = eq[0]
                 m_exogs = eq[1]
-                model_m = OLSOutcomeModel(data_array, m_endog, m_exogs, self._symb_to_ind,
-                                          self._symb_to_var, self.options)
+                model_m = OLSOutcomeModel(
+                    data_array,
+                    m_endog,
+                    m_exogs,
+                    self._symb_to_ind,
+                    self._symb_to_var,
+                    self.options,
+                )
                 models[med_name] = model_m
         return models
 
@@ -762,8 +1131,14 @@ class Process(object):
     def _gen_direct_effect_model(self):
         mod_names = self.moderators["x_direct"]
         model_iv = self.outcome_models[self.iv]
-        dem = DirectEffectModel(model_iv, mod_names, self.spotlight_values, self.has_mediation,
-                                self._symb_to_var, self.options)
+        dem = DirectEffectModel(
+            model_iv,
+            mod_names,
+            self.spotlight_values,
+            self.has_mediation,
+            self._symb_to_var,
+            self.options,
+        )
         return dem
 
     def _gen_indirect_effect_model(self):
@@ -773,17 +1148,33 @@ class Process(object):
         mod_symb = self.moderators["indirect"]
         spot_values = self.spotlight_values
         analysis_list = self._gen_analysis_list()
-        iem = ParallelMediationModel(data_array, y_exogvars, m_exogvars, mod_symb, spot_values, self.n_meds,
-                                     analysis_list, self._symb_to_ind, self._symb_to_var, self.options)
+        iem = ParallelMediationModel(
+            data_array,
+            y_exogvars,
+            m_exogvars,
+            mod_symb,
+            spot_values,
+            self.n_meds,
+            analysis_list,
+            self._symb_to_ind,
+            self._symb_to_var,
+            self.options,
+        )
         return iem
 
     def _print_init(self):
-        initstr = ("Process successfully initialized.\n"
-                   "Based on the Process Macro by Andrew F. Hayes, Ph.D. (www.afhayes.com)\n\n"
-                   "\n****************************** SPECIFICATION ****************************\n\n"
-                   f"Model = {self.model_num}\n\n"
-                   "Variables:")
-        parameters = [(symb, name) for (symb, name) in self._symb_to_var.items() if "*" not in symb and "c" not in symb]
+        initstr = (
+            "Process successfully initialized.\n"
+            "Based on the Process Macro by Andrew F. Hayes, Ph.D. (www.afhayes.com)\n\n"
+            "\n****************************** SPECIFICATION ****************************\n\n"
+            f"Model = {self.model_num}\n\n"
+            "Variables:"
+        )
+        parameters = [
+            (symb, name)
+            for (symb, name) in self._symb_to_var.items()
+            if "*" not in symb and "c" not in symb
+        ]
         for symb, name in parameters:
             if "*" in symb or "c" in symb:
                 pass
@@ -801,9 +1192,11 @@ class Process(object):
         if self.n_obs_null:
             initstr += f" ({self.n_obs_null} observations removed due to missingness)"
         if self.has_mediation:
-            initstr += ("\n\nBootstrapping information for indirect effects:\n"
-                        f"Final number of bootstrap samples: {self.options['boot']}\n"
-                        f"Number of samples discarded due to convergence issues: {self.indirect_model._n_fail_samples}")
+            initstr += (
+                "\n\nBootstrapping information for indirect effects:\n"
+                f"Final number of bootstrap samples: {self.options['boot']}\n"
+                f"Number of samples discarded due to convergence issues: {self.indirect_model._n_fail_samples}"
+            )
 
         print(initstr)
 
@@ -835,7 +1228,8 @@ class Process(object):
 
         terms = y_exogvars + m_exogvars
         threeway = any(
-            [1 if len(term.split("*")) == 3 else 0 for term in terms])  # Find if there is any three-way interaction
+            [1 if len(term.split("*")) == 3 else 0 for term in terms]
+        )  # Find if there is any three-way interaction
 
         if n_mods == 1:
             return ["MM"]
@@ -876,7 +1270,9 @@ class Process(object):
                 hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
                 hue2_values = [0]
             else:
-                raise ValueError("The argument 'hue' must be a string or a list of length 1 or 2.")
+                raise ValueError(
+                    "The argument 'hue' must be a string or a list of length 1 or 2."
+                )
         else:
             huevar1 = None
             huevar2 = None
@@ -895,7 +1291,8 @@ class Process(object):
 
         if modval_others_invalid:
             raise SyntaxError(
-                "You cannot specify more than one focal value for moderator that is not displayed in the graph.")
+                "You cannot specify more than one focal value for moderator that is not displayed in the graph."
+            )
 
         modval_parsed = {**modval_others, **modval_vars}
 
@@ -903,8 +1300,10 @@ class Process(object):
             m_var = self._symb_to_var[m]
             if modval_parsed.get(m_var) is None:
                 warnings.warn(
-                    f'The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on\
-                     the graph. Its value has been explicitely set to 0.', SyntaxWarning)
+                    f"The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on\
+                     the graph. Its value has been explicitely set to 0.",
+                    SyntaxWarning,
+                )
                 modval_parsed[m_var] = [0]
         return modval_parsed
 
@@ -916,26 +1315,40 @@ class Process(object):
         """
         with pd.option_context("precision", self.options["precision"]):
             full_model = self.outcome_models[self.iv]
-            m_models = [self.outcome_models.get(med_name) for med_name in self.mediators]
+            m_models = [
+                self.outcome_models.get(med_name) for med_name in self.mediators
+            ]
             if self.options["detail"]:
-                print("\n***************************** OUTCOME MODELS ****************************\n")
+                print(
+                    "\n***************************** OUTCOME MODELS ****************************\n"
+                )
                 print(full_model)
-                print("\n-------------------------------------------------------------------------\n")
+                print(
+                    "\n-------------------------------------------------------------------------\n"
+                )
                 for med_model in m_models:
                     print(med_model)
-                    print("\n-------------------------------------------------------------------------\n")
+                    print(
+                        "\n-------------------------------------------------------------------------\n"
+                    )
             if self.indirect_model:
-                print("\n********************** DIRECT AND INDIRECT EFFECTS **********************\n")
+                print(
+                    "\n********************** DIRECT AND INDIRECT EFFECTS **********************\n"
+                )
                 print(self.direct_model)
                 print(self.indirect_model)
             else:
-                print("\n********************** CONDITIONAL EFFECTS **********************\n")
+                print(
+                    "\n********************** CONDITIONAL EFFECTS **********************\n"
+                )
                 print(self.direct_model)
 
     def get_bootstrap_estimates(self):
         if not self.has_mediation:
-            raise NotImplementedError("This model does not have a mediation. As such, no bootstrap samples were "
-                                      "generated.")
+            raise NotImplementedError(
+                "This model does not have a mediation. As such, no bootstrap samples were "
+                "generated."
+            )
         iem = self.indirect_model
         boot_betas_y = iem._boot_betas_y
         boot_betas_m = iem._boot_betas_m
@@ -953,7 +1366,9 @@ class Process(object):
         del df["___"]
         return df.reset_index()
 
-    def floodlight_indirect_effect(self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5):
+    def floodlight_indirect_effect(
+        self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
+    ):
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -963,9 +1378,13 @@ class Process(object):
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
                 if not mod_symb:
-                    raise ValueError(f"The variable {mod_name} is not a variable in the model.")
+                    raise ValueError(
+                        f"The variable {mod_name} is not a variable in the model."
+                    )
                 if isinstance(v, list):
-                    raise ValueError(f"The spotlight value for the variable {k} should be a number, not a list.")
+                    raise ValueError(
+                        f"The spotlight value for the variable {k} should be a number, not a list."
+                    )
                 else:
                     other_modval_symb[symb] = v
 
@@ -973,14 +1392,18 @@ class Process(object):
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
         if mod_symb not in self.moderators["indirect"]:
-            raise ValueError(f"The variable {mod_name} does not moderate the indirect path in Model {self.model_num}.")
+            raise ValueError(
+                f"The variable {mod_name} does not moderate the indirect path in Model {self.model_num}."
+            )
 
         for ms in self.moderators["indirect"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
                 other_modval_symb[ms] = 0
 
         if not med_name:
-            raise ValueError("You must specify the name of the mediator for which to plot the indirect effects")
+            raise ValueError(
+                "You must specify the name of the mediator for which to plot the indirect effects"
+            )
 
         try:
             med_index = self.mediators.index(med_name)
@@ -989,13 +1412,20 @@ class Process(object):
 
         mod_values = self.data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
-        sig_regions = self.indirect_model._floodlight_analysis(med_index, mod_symb, modval_range,
-                                                               other_modval_symb, atol=atol, rtol=rtol)
-        prec = self.options['precision']
-        other_modval_name = {self._symb_to_var[k]: v for k, v in other_modval_symb.items()}
-        return IndirectFloodlightAnalysis(med_name, mod_name, sig_regions, modval_range, other_modval_name, prec)
+        sig_regions = self.indirect_model._floodlight_analysis(
+            med_index, mod_symb, modval_range, other_modval_symb, atol=atol, rtol=rtol
+        )
+        prec = self.options["precision"]
+        other_modval_name = {
+            self._symb_to_var[k]: v for k, v in other_modval_symb.items()
+        }
+        return IndirectFloodlightAnalysis(
+            med_name, mod_name, sig_regions, modval_range, other_modval_name, prec
+        )
 
-    def floodlight_direct_effect(self, mod_name, other_modval=None, atol=1e-8, rtol=1e-5):
+    def floodlight_direct_effect(
+        self, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
+    ):
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -1005,14 +1435,20 @@ class Process(object):
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
                 if not mod_symb:
-                    raise ValueError(f"The variable {mod_name} is not a variable in the model.")
+                    raise ValueError(
+                        f"The variable {mod_name} is not a variable in the model."
+                    )
                 if isinstance(v, list):
-                    raise ValueError(f"The spotlight value for the variable {k} should be a number, not a list.")
+                    raise ValueError(
+                        f"The spotlight value for the variable {k} should be a number, not a list."
+                    )
                 else:
                     other_modval_symb[symb] = v
 
         if mod_symb not in self.moderators["x_direct"]:
-            raise ValueError(f"The variable {mod_name} does not moderate the direct path in Model {self.model_num}.")
+            raise ValueError(
+                f"The variable {mod_name} does not moderate the direct path in Model {self.model_num}."
+            )
 
         for ms in self.moderators["x_direct"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
@@ -1020,11 +1456,16 @@ class Process(object):
 
         mod_values = self.data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
-        sig_regions = self.direct_model._floodlight_analysis(mod_symb, modval_range, other_modval_symb,
-                                                             atol=atol, rtol=rtol)
-        other_modval_name = {self._symb_to_var[k]: v for k, v in other_modval_symb.items()}
+        sig_regions = self.direct_model._floodlight_analysis(
+            mod_symb, modval_range, other_modval_symb, atol=atol, rtol=rtol
+        )
+        other_modval_name = {
+            self._symb_to_var[k]: v for k, v in other_modval_symb.items()
+        }
         prec = self.options["precision"]
-        return DirectFloodlightAnalysis(mod_name, sig_regions, modval_range, other_modval_name, prec)
+        return DirectFloodlightAnalysis(
+            mod_name, sig_regions, modval_range, other_modval_name, prec
+        )
 
     def spotlight_indirect_effect(self, med_name, spotval=None):
         """
@@ -1042,10 +1483,14 @@ class Process(object):
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
         if len(self.moderators["indirect"]) == 0:
-            raise ValueError(f"The indirect path of Model {self.model_num} does not include a moderator.")
+            raise ValueError(
+                f"The indirect path of Model {self.model_num} does not include a moderator."
+            )
 
         if not med_name:
-            raise ValueError("You must specify the name of the mediator for which to plot the indirect effects")
+            raise ValueError(
+                "You must specify the name of the mediator for which to plot the indirect effects"
+            )
 
         try:
             med_index = self.mediators.index(med_name)
@@ -1058,13 +1503,17 @@ class Process(object):
             for mod_name, mod_val in spotval.items():
                 mod_symb = self._var_to_symb.get(mod_name)
                 if not mod_symb:
-                    raise ValueError(f"The variable {mod_name} is not a variable in the model.")
+                    raise ValueError(
+                        f"The variable {mod_name} is not a variable in the model."
+                    )
                 else:
                     spotval_symb[mod_symb] = mod_val
 
         names, v = zip(*spotval_symb.items())
         values = np.array([i for i in product(*v)])
-        effect, _, se, llci, ulci = self.indirect_model._get_conditional_indirect_effects(med_index, names, values)
+        effect, _, se, llci, ulci = self.indirect_model._get_conditional_indirect_effects(
+            med_index, names, values
+        )
 
         rows = np.array([effect, se, llci, ulci]).T
 
@@ -1086,7 +1535,9 @@ class Process(object):
             A DataFrame of direct Effects/SE/LLCI/ULCI, at various levels of the moderators.
         """
         if not self.moderators["x_direct"]:
-            raise ValueError(f"The direct path of Model {self.model_num} does not include a moderator.")
+            raise ValueError(
+                f"The direct path of Model {self.model_num} does not include a moderator."
+            )
 
         spotval_symb = self.spotlight_values.copy()
 
@@ -1094,14 +1545,18 @@ class Process(object):
             for mod_name, mod_val in spotval.items():
                 mod_symb = self._var_to_symb.get(mod_name)
                 if not mod_symb:
-                    raise ValueError(f"The variable {mod_name} is not a variable in the model.")
+                    raise ValueError(
+                        f"The variable {mod_name} is not a variable in the model."
+                    )
                 else:
                     spotval_symb[mod_symb] = mod_val
 
         names, v = zip(*spotval_symb.items())
         values = np.array([i for i in product(*v)])
 
-        effect, se, llci, ulci = self.direct_model._get_conditional_direct_effects(names, values)
+        effect, se, llci, ulci = self.direct_model._get_conditional_direct_effects(
+            names, values
+        )
 
         rows = np.array([effect, se, llci, ulci]).T
 
@@ -1113,8 +1568,19 @@ class Process(object):
         df.rename(columns=lambda c: stv.get(c, c), inplace=True)
         return df
 
-    def plot_conditional_direct_effects(self, x=None, hue=None, row=None, col=None, modval=None,
-                                        errstyle="band", hue_format=None, facet_kws=None, plot_kws=None, err_kws=None):
+    def plot_conditional_direct_effects(
+        self,
+        x=None,
+        hue=None,
+        row=None,
+        col=None,
+        modval=None,
+        errstyle="band",
+        hue_format=None,
+        facet_kws=None,
+        plot_kws=None,
+        err_kws=None,
+    ):
         """
         Plot the conditional direct effects of the IV, at specified values of the moderator(s).
         The functions relies on Seaborn's FacetGrid object, to represent complex interactions between up to 5 different
@@ -1165,14 +1631,37 @@ class Process(object):
         if modval is None:
             modval = {}
 
-        modval_parsed = self._parse_moderator_values(x, hue, row, col, modval, "x_direct")
+        modval_parsed = self._parse_moderator_values(
+            x, hue, row, col, modval, "x_direct"
+        )
         df_effects = self.spotlight_direct_effect(spotval=modval_parsed)
-        return plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
-                                        plot_kws, err_kws)
+        return plot_conditional_effects(
+            df_effects,
+            x,
+            hue,
+            row,
+            col,
+            errstyle,
+            hue_format,
+            facet_kws,
+            plot_kws,
+            err_kws,
+        )
 
-    def plot_conditional_indirect_effects(self, med_name=None, x=None, hue=None, row=None, col=None, modval=None,
-                                          errstyle="band", hue_format=None, facet_kws=None, plot_kws=None,
-                                          err_kws=None):
+    def plot_conditional_indirect_effects(
+        self,
+        med_name=None,
+        x=None,
+        hue=None,
+        row=None,
+        col=None,
+        modval=None,
+        errstyle="band",
+        hue_format=None,
+        facet_kws=None,
+        plot_kws=None,
+        err_kws=None,
+    ):
         """
         Plot the conditional indirect effect for a given mediator, at specified values of the moderator(s).
         The functions relies on Seaborn's FacetGrid object, to represent complex interactions between up to 5 different
@@ -1224,19 +1713,35 @@ class Process(object):
         if modval is None:
             modval = {}
 
-        modval_parsed = self._parse_moderator_values(x, hue, row, col, modval, path="indirect")
-        df_effects = self.spotlight_indirect_effect(med_name=med_name, spotval=modval_parsed)
+        modval_parsed = self._parse_moderator_values(
+            x, hue, row, col, modval, path="indirect"
+        )
+        df_effects = self.spotlight_indirect_effect(
+            med_name=med_name, spotval=modval_parsed
+        )
 
-        return plot_conditional_effects(df_effects, x, hue, row, col, errstyle, hue_format, facet_kws,
-                                        plot_kws, err_kws)
+        return plot_conditional_effects(
+            df_effects,
+            x,
+            hue,
+            row,
+            col,
+            errstyle,
+            hue_format,
+            facet_kws,
+            plot_kws,
+            err_kws,
+        )
 
     # DEPRECATED METHODS
     def plot_indirect_effects(self, *args, **kwargs):
         raise DeprecationWarning(
             "The method 'plot_indirect_effects' has been deprecated. Please use the equivalent method named \
-            'plot_conditional_indirect_effects.")
+            'plot_conditional_indirect_effects."
+        )
 
     def plot_direct_effects(self, *args, **kwargs):
         raise DeprecationWarning(
             "The method 'plot_direct_effects' has been deprecated. Please use the equivalent method named \
-            'plot_conditional_direct_effects.")
+            'plot_conditional_direct_effects."
+        )
