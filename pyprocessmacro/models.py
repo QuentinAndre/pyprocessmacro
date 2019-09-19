@@ -1025,9 +1025,8 @@ class ParallelMediationModel(object):
             e_both_on[i], be_both_on[i], *_ = self._indirect_effect_at(i, dict_both_on)
             e_mod1_on[i], be_mod1_on[i], *_ = self._indirect_effect_at(i, dict_mod1_on)
             e_mod2_on[i], be_mod2_on[i], *_ = self._indirect_effect_at(i, dict_mod2_on)
-
             e_mmm = e_both_on[i] - (e_mod1_on[i] + e_mod2_on[i]) / 2
-            be_mmm = be_both_on[i] - (be_mod1_on[i] + be_mod1_on[i]) / 2
+            be_mmm = be_both_on[i] - (be_mod1_on[i] + be_mod2_on[i]) / 2
 
             effects[0][i] = e_mmm
             se[0][i] = be_mmm.std(ddof=1)
@@ -1104,7 +1103,7 @@ class ParallelMediationModel(object):
         for i in range(self._n_meds):
             for j, val in enumerate(
                 mod1_val
-            ):  # Conditional moderated mediation effects for Moderator 1
+            ):  # Conditional moderated mediation effects for Moderator 2
                 # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
                 # noinspection PyTypeChecker
@@ -1127,9 +1126,9 @@ class ParallelMediationModel(object):
                 mod2_val
             ):  # Conditional moderated mediation effects for Moderator 1
                 # noinspection PyTypeChecker
-                dict_off = dict([[mod1, val], [mod2, 0]])
+                dict_off = dict([[mod2, val], [mod1, 0]])
                 # noinspection PyTypeChecker
-                dict_on = dict([[mod1, val], [mod2, 1]])
+                dict_on = dict([[mod2, val], [mod1, 1]])
                 e_off, be_off, *_ = self._indirect_effect_at(i, dict_off)
                 e_on, be_on, *_ = self._indirect_effect_at(i, dict_on)
                 e_cmm = e_on - e_off
