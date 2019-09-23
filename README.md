@@ -64,7 +64,7 @@ In the current version, the following features have not yet been ported to PyPro
 ## Master Versions
 
 ### 1.0.2
-** Bug fix in the Index of Moderated Moderated Mediation**
+**Bug fix in the Index of Moderated Moderated Mediation**
 In the summary, the Index of Moderated Moderated Mediation was reported as a zero-width confidence interval.
 
 ### 1.0.0 
