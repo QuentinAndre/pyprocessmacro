@@ -1,4 +1,4 @@
-PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
+﻿PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 ===========================================================================
 
 # Copyright Notice for the original Process Macro
@@ -62,6 +62,10 @@ In the current version, the following features have not yet been ported to PyPro
 # Version History
 
 ## Master Versions
+
+### 1.0.2
+** Bug fix in the Index of Moderated Moderated Mediation**
+In the summary, the Index of Moderated Moderated Mediation was reported as a zero-width confidence interval.
 
 ### 1.0.0 
 **Added support for floodlight analysis (Johnson-Neyman region of significance).**
