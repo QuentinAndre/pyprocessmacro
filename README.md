@@ -1,5 +1,5 @@
 ﻿PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
-===========================================================================
+============================================================================
 
 # Copyright Notice for the original Process Macro
 
@@ -10,7 +10,7 @@ must not be edited or modified, and must not be distributed outside of
 Because PyProcessMacro is a complete reimplementation of the Process Macro, and was not based on the original 
 code, permission was generously granted by Andrew F. Hayes to distribute PyProcessMacro under a MIT license.
  
- This permission is not an endorsement of PyProcessMacro: all potential errors, bugs and inaccuracies are my own, and
+This permission is not an endorsement of PyProcessMacro: all potential errors, bugs and inaccuracies are my own, and
 Andrew F. Hayes was not involved in writing, reviewing, or debugging the code.
 
 # Manifest

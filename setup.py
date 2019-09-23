@@ -18,6 +18,8 @@ setup(
 
     long_description=open('README.md', encoding="utf-8").read(),
 
+    long_description_content_type='text/markdown',
+
     install_requires=["numpy", "matplotlib", "pandas", "scipy", "seaborn"],
 
     keywords=['mediation-analysis', 'statistics', 'process', 'plotting', 'data-science', 'data-analysis',
