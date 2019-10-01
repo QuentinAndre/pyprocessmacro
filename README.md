@@ -63,6 +63,11 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.3
+**Bug fix for Models 58 and 59**
+The number of moderators was not properly computed, and pyprocessmacro was crashing on those two models. It has now 
+been fixed. Thanks to amrain-py for the bug report.
+
 ### 1.0.2
 **Bug fix in the Index of Moderated Moderated Mediation**
 In the summary, the Index of Moderated Moderated Mediation was reported as a zero-width confidence interval.

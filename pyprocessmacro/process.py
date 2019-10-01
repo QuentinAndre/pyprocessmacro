@@ -1203,8 +1203,8 @@ class Process(object):
     def _gen_analysis_list(self):
         """
         Process always report the indirect effect/conditional indirect effect(s).
-        If one moderator is present, Process will report the Moderated Mediation Index (MM).
-        If exactly two moderators are present, additional analysis could be reported: the
+        If one moderator is present on the indirect path, Process will report the Moderated Mediation Index (MM).
+        If exactly two moderators are present on the indirect path, additional analysis could be reported: the
         Conditional Moderated Mediation (CMM), the Moderated Moderated Mediation (MMM), and the
         Partial Moderated Mediation (PMM). This function establishes which of those statistics should be reported:
           1. If the two moderators are on two different paths (X to M, or M to Y): both CMM and MMM are reported.
@@ -1217,13 +1217,13 @@ class Process(object):
         :return: list
             ["MM"], ["MMM", "CMM"], ["PMM"] or []
         """
-        n_mods_x = len(self.moderators["x_indirect"])
         n_mods_m = len(self.moderators["m"])
-        n_mods = n_mods_m + n_mods_x
+        n_mods_ind = len(self.moderators["indirect"])
+
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
 
-        if n_mods == 0:  # No moderators, so no additional analysis.
+        if n_mods_ind == 0:  # No moderators on indirect path, so no additional analysis.
             return []
 
         terms = y_exogvars + m_exogvars
@@ -1231,9 +1231,9 @@ class Process(object):
             [1 if len(term.split("*")) == 3 else 0 for term in terms]
         )  # Find if there is any three-way interaction
 
-        if n_mods == 1:
+        if n_mods_ind == 1: # One single moderator, moderated mediation analysis
             return ["MM"]
-        elif n_mods == 2:
+        elif n_mods_ind == 2:
             if (n_mods_m == 1) or threeway:  # Moderators on two different paths
                 return ["MMM", "CMM"]
             else:
