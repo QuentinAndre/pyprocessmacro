@@ -266,7 +266,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
         resid = y - dot(x, betas)
         mse = (resid ** 2).sum() / df_e
         sse = dot(resid.T, resid) / df_e
-        errortype = "standard" if self._options["hc3"] == 1 else "HC3"
+        errortype = "standard" if self._options["hc3"] is False else "HC3"
         if errortype == "standard":
             vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
         elif errortype == "HC0":

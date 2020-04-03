@@ -52,18 +52,18 @@ def get_ols_accuracy(model_num):
 
     process = Process(data, model_num,precision=4, conf=95, modval={},
                       quantile=False, logit=False, seed=123456, suppr_init=True,
-                      total=True, **kwargs)
+                      total=True, hc3=True, **kwargs)
 
     dir = process.direct_model
     indir = process.indirect_model
 
-    if dir.has_moderation:
+    if dir._has_moderation:
         truedir = get_direct_effect_mod(spssoutput)
     else:
         truedir = get_direct_effect(spssoutput)
     estdir = dir.coeff_summary()
 
-    if indir.has_moderation:
+    if indir._has_moderation:
         trueindir = get_indirect_effect_mod(spssoutput)
     else:
         trueindir = get_indirect_effect(spssoutput)
@@ -101,18 +101,18 @@ def get_logit_accuracy(model_num):
 
     process = Process(data, model_num, precision=4, conf=95, modval={},
                       quantile=False, logit=True, seed=123456,
-                      total=True, suppr_init=True, **kwargs)
+                      total=True, suppr_init=True, hc3=True, **kwargs)
 
     dir = process.direct_model
     indir = process.indirect_model
 
-    if dir.has_moderation:
+    if dir._has_moderation:
         truedir = get_direct_effect_mod(spssoutput)
     else:
         truedir = get_direct_effect(spssoutput)
     estdir = dir.coeff_summary()
 
-    if indir.has_moderation:
+    if indir._has_moderation:
         trueindir = get_indirect_effect_mod(spssoutput)
     else:
         trueindir = get_indirect_effect(spssoutput)

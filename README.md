@@ -63,6 +63,12 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.4
+**Bug fix for standard error estimate in all models**
+PyProcessMacro was, by default, using the HC3 estimator for the variance-covariance matrix instead of the HC0 estimator. 
+This has now been changed. To continue using the HC3 estimator, specify `hc3=True` when initializing the Process instance. 
+Thanks to Zoé Ziani for the bug report.
+
 ### 1.0.3
 **Bug fix for Models 58 and 59**
 The number of moderators was not properly computed, and pyprocessmacro was crashing on those two models. It has now 
