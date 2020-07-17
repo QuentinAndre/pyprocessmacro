@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from pyprocessmacro import Process
+from ..pyprocessmacro.process import Process
 from io import StringIO
 
 MODELS_LIST = [5] + [i for i in range(7, 73)] + [75, 76]
