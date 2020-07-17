@@ -1,0 +1,7 @@
+avanade_run/*
+notebooks/*
+*.ipynb_checkpoints
+*__pycache__
+*.pyc
+
+.vscode/settings.json

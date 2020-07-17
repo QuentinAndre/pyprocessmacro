@@ -254,8 +254,8 @@ class OLSOutcomeModel(BaseOutcomeModel):
         estimation_results.
         :return: self
         """
-        y = self._endog
-        x = self._exog
+        y = self._endog.astype(float)
+        x = self._exog.astype(float)
         n_obs = self._n_obs
         n_vars = self._n_vars
         inv_xx = inv(dot(x.T, x))
@@ -602,15 +602,15 @@ class ParallelMediationModel(object):
             * true_betas_m is a list of vectors of size n_params_m
         """
         # True betas of the path from Ms to Y
-        endog_y = self._data[:, self._ind_y]
-        exog_y = self._data[:, self._exog_inds_y]
+        endog_y = self._data[:, self._ind_y].astype(float)
+        exog_y = self._data[:, self._exog_inds_y].astype(float)
         true_betas_y = self._compute_betas_y(endog_y, exog_y)
 
         # For each mediator Mi, true betas from X to Mi
         true_betas_m = []
-        m_exog = self._data[:, self._exog_inds_m]
+        m_exog = self._data[:, self._exog_inds_m].astype(float)
         for m_ind in self._inds_m:
-            m_endog = self._data[:, m_ind]
+            m_endog = self._data[:, m_ind].astype(float)
             betas = self._compute_betas_m(m_endog, m_exog)
             true_betas_m.append(betas)
 

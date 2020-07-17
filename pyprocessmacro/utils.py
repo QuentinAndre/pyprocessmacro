@@ -5,7 +5,7 @@ import numpy as np
 from numpy import dot
 from numpy.linalg import inv, LinAlgError
 from scipy.stats import norm
-from seaborn import FacetGrid
+# from seaborn import FacetGrid
 
 
 def z_score(conf):
@@ -52,6 +52,8 @@ def fast_OLS(endog, exog):
     A simple function for (X'X)^(-1)X'Y
     :return: The Kx1 array of estimated coefficients.
     """
+    endog = endog.astype(float)
+    exog = exog.astype(float)
     try:
         return dot(dot(inv(dot(exog.T, exog)), exog.T), endog).squeeze()
     except LinAlgError:
