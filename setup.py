@@ -33,8 +33,9 @@ setup(
         "Natural Language :: English",
         "Development Status :: 4 - Beta",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.5"
+        "Programming Language :: Python :: 3.7"
     ],
 
-    license="MIT"
+    license="MIT",
+    python_requires='>=3.7'
 )
