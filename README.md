@@ -63,6 +63,11 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.5
+**Bug fix on newer numpy version**
+A recent numpy version was causing PyProcessMacro to crash on non-float data. Thanks to William Harding for the bug
+report and for the fix.
+
 ### 1.0.4
 **Bug fix for standard error estimate in all models**
 PyProcessMacro was, by default, using the HC3 estimator for the variance-covariance matrix instead of the HC0 estimator. 
@@ -414,7 +419,7 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 g = p.plot_direct_effects(x="Motivation") 
 plt.show()
 ````
-![BasicExample](Images/Ex1.png)
+![BasicExample](images/Ex1.png)
 
 ````python
 # Conditional indirect effects through MediationSkills, at values of Motivation (x-axis) and 
@@ -423,19 +428,19 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
 g.add_legend(title="") # Add the legend for the color-coding
 plt.show()
 ````
-![ColorCodedModerator](Images/Ex2.png)
+![ColorCodedModerator](images/Ex2.png)
 ````python
 # Display the values for SkillRelevance on side-by-side plots instead.
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", col="SkillRelevance")
 plt.show()
 ````
-![ColCodedModerator](Images/Ex3.png)
+![ColCodedModerator](images/Ex3.png)
 ````python
 # Display the values for SkillRelevance on vertical plots instead.
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", row="SkillRelevance")
 plt.show()
 ````
-![RowCodedModerator](Images/Ex4.png)
+![RowCodedModerator](images/Ex4.png)
 ### B. Change the spotlight values
 
 By default, the spotlight values used to plot the effects are the same as the ones passed when initializing Process.
@@ -448,7 +453,7 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
 g.add_legend(title="")
 plt.show()
 ````
-![ChangeSpotValues](Images/Ex6.png)
+![ChangeSpotValues](images/Ex6.png)
 
 ### C. Representation of uncertainty
 
@@ -466,7 +471,7 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
                             modval={"Motivation": [0, 1], "SkillRelevance":[-1, 0, 1]},
                             errstyle="ci")
 ````
-![ErrStyleCI](Images/Ex7.png)
+![ErrStyleCI](images/Ex7.png)
 
 ````python                
 # Error band for continous moderator
@@ -474,7 +479,7 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
                             modval={"SkillRelevance":[-1, 0, 1]},
                             errstyle="ci")
 ````
-![ErrStyleBand](Images/Ex8.png)
+![ErrStyleBand](images/Ex8.png)
 ````python
 # No representation of error
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="SkillRelevance", 
@@ -483,7 +488,7 @@ g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", hue="Ski
                             
 plt.show()
 ````
-![ErrStyleNone](Images/Ex9.png)
+![ErrStyleNone](images/Ex9.png)
 
 
 ### D. "Partial" plots
@@ -503,7 +508,7 @@ p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="Skill
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation") 
 plt.show() # This plot represents the "partial" conditional indirect effect, when SkillRelevance is evaluated at 0.
 ````
-![PartialPlotDefault](Images/Ex10.png)
+![PartialPlotDefault](images/Ex10.png)
 
 
 If you want the omitted moderator(s) to have a different value than 0, you must pass a unique value for each moderator
@@ -513,7 +518,7 @@ as a key in the `modval` dictionary:
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", modval={"SkillRelevance":[-5]}) 
 plt.show() # This plot represents the "partial" conditional indirect effect, when SkillRelevance is evaluated at -5.
 ````
-![PartialPlotCustom](Images/Ex11.png)
+![PartialPlotCustom](images/Ex11.png)
 
 If you pass multiple values in `modval` for a moderator that is not displayed of the graph, the method will 
 return an error.
@@ -545,7 +550,7 @@ facet_kws = {'aspect': 1}  #Grid: Make the FacetGrid a square rather than a rect
 g = p.plot_indirect_effects(med_name="MediationSkills", x="Motivation", errstyle="ci",
                             plot_kws=plot_kws, err_kws=err_kws, facet_kws=facet_kws)
 ````
-![PlotCustomKws](Images/Ex12.png)
+![PlotCustomKws](images/Ex12.png)
 
 # 7. About
 PyProcessMacro was developed by Quentin André during his PhD in Marketing at INSEAD Business School, France. 

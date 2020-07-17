@@ -142,8 +142,9 @@ class BaseOutcomeModel(object):
 
         endog_ind = self._symb_to_ind[self._endogvar]
         exog_ind = [self._symb_to_ind[var] for var in self._exogvars]
-        self._endog = data[:, endog_ind]
-        self._exog = data[:, exog_ind]
+        self._endog = data[:, endog_ind].astype(float)
+        self._exog = data[:, exog_ind].astype(float)
+
         self._n_obs = self._exog.shape[0]
         self._n_vars = self._exog.shape[1]
 
