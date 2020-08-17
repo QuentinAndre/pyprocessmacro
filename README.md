@@ -63,7 +63,7 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
-### 1.0.7
+### 1.0.8
 **Bug fix on plot_conditional_(in)direct effects**
 An error warning was unnecessarily generated for some variable names. This has now been fixed.
 

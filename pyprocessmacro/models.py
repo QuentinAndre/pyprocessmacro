@@ -1780,4 +1780,3 @@ class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
         super().__init__(
             med_name, mod_name, sig_regions, modval_range, other_modval_name, precision
         )
-        print(self.__class__.__bases__)

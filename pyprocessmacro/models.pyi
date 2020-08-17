@@ -215,6 +215,7 @@ class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
         precision: int,
     ) -> None: ...
 
+
 class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
     def __init__(
         self,
