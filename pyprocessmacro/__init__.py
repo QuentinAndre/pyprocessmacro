@@ -2,9 +2,8 @@
 """
 Core module for the PyProcess Macro.
 """
-
 from .process import Process
 
 __all__ = ["Process"]
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"

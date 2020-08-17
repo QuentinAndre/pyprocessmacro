@@ -712,7 +712,7 @@ class Process(object):
         self.model_num = model
 
         self.controls = controls
-        self.data = data
+        self._data = data
         arguments = locals()
 
         # Validate the arguments supplied as options
@@ -723,7 +723,7 @@ class Process(object):
         var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
 
         self.mediators = var_kwargs.get("m")
-        self.iv = var_kwargs.get("y")[0]  # TODO: Ugly, change this
+        self.iv = var_kwargs.get("y")
 
         self.varlist = self._gen_valid_varlist(var_kwargs)
 
@@ -742,7 +742,7 @@ class Process(object):
         raw_equations = copy.deepcopy(self.__models_eqs__[model])
         raw_varlist = copy.deepcopy(self.__models_vars__[model])
 
-        self.moderators = gen_moderators(raw_equations, raw_varlist)
+        self._moderators = gen_moderators(raw_equations, raw_varlist)
 
         # Generating the equations used for estimation: a list of (exog, endog) tuples.
         self._equations = self._gen_equations(
@@ -750,19 +750,19 @@ class Process(object):
         )
 
         # Prepare the data: drop NaN, rename the columns, add a constant, and mean-center moderators if needed.
-        self.data, self.n_obs, self.n_obs_null, self.centered_vars = (
+        self._data, self.n_obs, self.n_obs_null, self.centered_vars = (
             self._prepare_data()
         )
 
-        # Now that the data is ready, create the dictionary mapping each variable to its column index.
-        self._symb_to_ind = {v: i for i, v in enumerate(self.data.columns.values)}
+        # Now that the data is ready, create the dictionary mapping each symbol to its column index.
+        self._symb_to_ind = {v: i for i, v in enumerate(self._data.columns.values)}
 
         # Generate the statistical models that will be estimated
         self.outcome_models = self._gen_outcome_models()
 
         # Rename the dictionary of custom spotlight values, and generating the spotlight values.
         modval_symb = {self._var_to_symb.get(k): v for k, v in modval.items()}
-        self.spotlight_values = self._gen_spotlight_values(modval_symb)
+        self._spotlight_values = self._gen_spotlight_values(modval_symb)
 
         # Generate the direct model.
         self.direct_model = self._gen_direct_effect_model()
@@ -876,7 +876,7 @@ class Process(object):
 
         varlist = list(set(self.controls) | set(var_kwargs_names))
         # Validate the presence of variables in the data.
-        miss_var_names = set(varlist) - set(self.data.columns)
+        miss_var_names = set(varlist) - set(self._data.columns)
         if miss_var_names:
             raise ValueError(
                 f"""One or several of the variables supplied to the model is/are not present in the
@@ -993,10 +993,10 @@ class Process(object):
         :return: pd.DataFrame
         """
         # Subset the data to the columns used in the model
-        data = self.data[self.varlist].copy()
-        n_obs_before = self.data.shape[0]
+        data = self._data[self.varlist].copy()
+        n_obs_before = self._data.shape[0]
         data = data.dropna().reset_index()
-        n_obs_after = self.data.shape[0]
+        n_obs_after = self._data.shape[0]
         n_obs_null = n_obs_before - n_obs_after
 
         # Map each variable name to a unique variable code, and rename the columns in the data.)
@@ -1019,8 +1019,8 @@ class Process(object):
 
         centered_vars = []
         if self.options["center"]:
-            mod_m = self.moderators["m"]
-            mod_x = self.moderators["x_indirect"] | self.moderators["x_direct"]
+            mod_m = self._moderators["m"]
+            mod_x = self._moderators["x_indirect"] | self._moderators["x_direct"]
             if mod_m:
                 centered_vars += list(mod_m) + list(
                     {c for c in data.columns if "m" in c}
@@ -1055,7 +1055,7 @@ class Process(object):
             and mediator(s)
         """
 
-        data_array = self.data.values
+        data_array = self._data.values
         models = {}
 
         # Generating the model for Y
@@ -1097,24 +1097,24 @@ class Process(object):
                 models[med_name] = model_m
         return models
 
-    def _gen_spotlight_values(self, modval):
+    def _gen_spotlight_values(self, modval_symb):
         """
         Generate the spotlight values of the moderators.
         The function first search the dictionary 'modval' for custom spotlight values.
         If they cannot be found, it uses discrete values if the moderator is discrete.
         If the moderator is not discrete, is uses quantiles or mean +/- 1SD, depending on the options specified
         in the Process object.
-        :param modval: dict
-            A dictionary {'mod_name':[mod_values]} of custom spotlight values for the moderator(s)
+        :param modval_symb: dict
+            A dictionary {'mod_symb':[mod_values]} of custom spotlight values for the moderator(s)
         :return: dict
-            A dictionary {'mod_name':[spot_values]} of spotlight values for all the moderator(s) of the model
+            A dictionary {'mod_symb':[spot_values]} of spotlight values for all the moderator(s) of the model
         """
         spot_values = {}
-        data = self.data.values
-        for mod in self.moderators["all"]:
+        data = self._data.values
+        for mod in self._moderators["all"]:
             index = self._symb_to_ind[mod]
             val = data[:, index]
-            spotvals = modval.get(mod, [])
+            spotvals = modval_symb.get(mod, [])
             if not spotvals:
                 if len(np.unique(val)) <= 5:
                     spot_values[mod] = np.unique(val)
@@ -1129,12 +1129,12 @@ class Process(object):
         return spot_values
 
     def _gen_direct_effect_model(self):
-        mod_names = self.moderators["x_direct"]
+        mod_names = self._moderators["x_direct"]
         model_iv = self.outcome_models[self.iv]
         dem = DirectEffectModel(
             model_iv,
             mod_names,
-            self.spotlight_values,
+            self._spotlight_values,
             self.has_mediation,
             self._symb_to_var,
             self.options,
@@ -1144,9 +1144,9 @@ class Process(object):
     def _gen_indirect_effect_model(self):
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
-        data_array = self.data.values
-        mod_symb = self.moderators["indirect"]
-        spot_values = self.spotlight_values
+        data_array = self._data.values
+        mod_symb = self._moderators["indirect"]
+        spot_values = self._spotlight_values
         analysis_list = self._gen_analysis_list()
         iem = ParallelMediationModel(
             data_array,
@@ -1217,8 +1217,8 @@ class Process(object):
         :return: list
             ["MM"], ["MMM", "CMM"], ["PMM"] or []
         """
-        n_mods_m = len(self.moderators["m"])
-        n_mods_ind = len(self.moderators["indirect"])
+        n_mods_m = len(self._moderators["m"])
+        n_mods_ind = len(self._moderators["indirect"])
 
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
@@ -1242,11 +1242,16 @@ class Process(object):
             return []
 
     def _parse_moderator_values(self, x, hue, row, col, modval, path):
+
+        modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
+        spotlight_values_symb = self._spotlight_values.copy()
+
         # Values for x-axis
-        x_values = modval.get(x)
+        x_symb = self._var_to_symb[x]
+        x_values = modval_symb.get(x_symb)
+
         if x_values is None:
-            x_symb = self._var_to_symb[x]
-            xdata = self.data[x_symb]
+            xdata = self._data[x_symb]
             if len(np.unique(xdata)) == 2:
                 x_values = np.unique(xdata)
             else:
@@ -1255,32 +1260,39 @@ class Process(object):
         # Values for hue
         if isinstance(hue, str):
             huevar1 = hue
+            huesymb1 = self._var_to_symb[huevar1]
             huevar2 = None
-            hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
+            hue1_values = modval_symb.get(huesymb1,
+                                          spotlight_values_symb[huesymb1])
             hue2_values = [0]
         elif isinstance(hue, list):
             if len(hue) == 2:
                 huevar1 = hue[0]
                 huevar2 = hue[1]
-                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
-                hue2_values = modval.get(huevar2, self.spotlight_values.get(huevar2))
+                huesymb1 = self._var_to_symb[huevar1]
+                huesymb2 = self._var_to_symb[huevar2]
+                hue1_values = modval_symb.get(huesymb1,
+                                              spotlight_values_symb[huesymb1])
+                hue2_values = modval_symb.get(huesymb2,
+                                              spotlight_values_symb[huesymb2])
             elif len(hue) == 1:
                 huevar1 = hue[0]
+                huesymb1 = self._var_to_symb[huevar1]
                 huevar2 = None
-                hue1_values = modval.get(huevar1, self.spotlight_values.get(huevar1))
+                hue1_values = modval_symb.get(huesymb1,
+                                              spotlight_values_symb[huesymb1])
                 hue2_values = [0]
-            else:
-                raise ValueError(
-                    "The argument 'hue' must be a string or a list of length 1 or 2."
-                )
         else:
             huevar1 = None
             huevar2 = None
             hue1_values = [0]
             hue2_values = [0]
 
-        col_values = modval.get(col, self.spotlight_values.get(col, [0]))
-        row_values = modval.get(row, self.spotlight_values.get(row, [0]))
+        col_symb = self._var_to_symb[x]
+        col_values = modval_symb.get(col_symb, spotlight_values_symb.get(col_symb, [0]))
+
+        row_symb = self._var_to_symb[x]
+        row_values = modval_symb.get(row_symb, spotlight_values_symb.get(row_symb, [0]))
 
         mod_names = [x, huevar1, huevar2, col, row]
         mod_values = [x_values, hue1_values, hue2_values, col_values, row_values]
@@ -1296,7 +1308,7 @@ class Process(object):
 
         modval_parsed = {**modval_others, **modval_vars}
 
-        for m in self.moderators[path]:
+        for m in self._moderators[path]:
             m_var = self._symb_to_var[m]
             if modval_parsed.get(m_var) is None:
                 warnings.warn(
@@ -1305,6 +1317,7 @@ class Process(object):
                     SyntaxWarning,
                 )
                 modval_parsed[m_var] = [0]
+        print(modval_parsed)
         return modval_parsed
 
     # API
@@ -1391,12 +1404,12 @@ class Process(object):
         if not self.has_mediation:
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
-        if mod_symb not in self.moderators["indirect"]:
+        if mod_symb not in self._moderators["indirect"]:
             raise ValueError(
                 f"The variable {mod_name} does not moderate the indirect path in Model {self.model_num}."
             )
 
-        for ms in self.moderators["indirect"]:
+        for ms in self._moderators["indirect"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
                 other_modval_symb[ms] = 0
 
@@ -1410,7 +1423,7 @@ class Process(object):
         except ValueError:
             raise ValueError(f"The variable {med_name} is not a mediator in the model.")
 
-        mod_values = self.data[mod_symb]
+        mod_values = self._data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
         sig_regions = self.indirect_model._floodlight_analysis(
             med_index, mod_symb, modval_range, other_modval_symb, atol=atol, rtol=rtol
@@ -1445,16 +1458,16 @@ class Process(object):
                 else:
                     other_modval_symb[symb] = v
 
-        if mod_symb not in self.moderators["x_direct"]:
+        if mod_symb not in self._moderators["x_direct"]:
             raise ValueError(
                 f"The variable {mod_name} does not moderate the direct path in Model {self.model_num}."
             )
 
-        for ms in self.moderators["x_direct"]:
+        for ms in self._moderators["x_direct"]:
             if (ms != mod_symb) and (ms not in other_modval_symb.keys()):
                 other_modval_symb[ms] = 0
 
-        mod_values = self.data[mod_symb]
+        mod_values = self._data[mod_symb]
         modval_range = [min(mod_values), max(mod_values)]
         sig_regions = self.direct_model._floodlight_analysis(
             mod_symb, modval_range, other_modval_symb, atol=atol, rtol=rtol
@@ -1482,7 +1495,7 @@ class Process(object):
         if not self.has_mediation:
             raise ValueError(f"Model {self.model_num} does not include a mediator.")
 
-        if len(self.moderators["indirect"]) == 0:
+        if len(self._moderators["indirect"]) == 0:
             raise ValueError(
                 f"The indirect path of Model {self.model_num} does not include a moderator."
             )
@@ -1497,7 +1510,7 @@ class Process(object):
         except ValueError:
             raise ValueError(f"The variable {med_name} is not a mediator in the model.")
 
-        spotval_symb = self.spotlight_values.copy()
+        spotval_symb = self._spotlight_values.copy()
 
         if spotval:
             for mod_name, mod_val in spotval.items():
@@ -1534,12 +1547,12 @@ class Process(object):
         :return:
             A DataFrame of direct Effects/SE/LLCI/ULCI, at various levels of the moderators.
         """
-        if not self.moderators["x_direct"]:
+        if not self._moderators["x_direct"]:
             raise ValueError(
                 f"The direct path of Model {self.model_num} does not include a moderator."
             )
 
-        spotval_symb = self.spotlight_values.copy()
+        spotval_symb = self._spotlight_values.copy()
 
         if spotval:
             for mod_name, mod_val in spotval.items():

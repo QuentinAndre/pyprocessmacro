@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-from typing import Union, Iterable, Dict, List, Any, Set, Tuple, Optional
+from typing import Union, Iterable, Dict, List, Any, Set, Tuple, Optional, NoReturn
 
 from numpy import ndarray
 from pandas.core.frame import DataFrame
 from seaborn.axisgrid import FacetGrid
-from typing_extensions import NoReturn
 
 from .models import (
     OLSOutcomeModel,
@@ -26,22 +25,23 @@ class Process(object):
 
     model_num: int
     controls: Iterable
-    data: DataFrame
     options = Dict[str, Any]
     varlist = List[str]
     mediators = List[str]
-    moderators: Dict[str, Set[str]]
+
     iv: str
     n_obs: int
     n_obs_null: int
     n_meds: int
     has_mediation: bool
     outcome_models: Dict[str, Union[OLSOutcomeModel, LogitOutcomeModel]]
-    spotlight_values: Dict[str, List[float]]
     direct_model: DirectEffectModel
     indirect_model: Union[None, ParallelMediationModel]
     centered_vars: Union[List, None]
 
+    _data: DataFrame
+    _moderators: Dict[str, Set[str]]
+    _spotlight_values: Dict[str, List[float]]
     _var_to_symb: Dict[str, str]
     _symb_to_var: Dict[str, str]
     _symb_to_ind: Dict[str, int]
@@ -157,6 +157,7 @@ class Process(object):
         plot_kws: Optional[Dict[str, Any]],
         err_kws: Optional[Dict[str, Any]],
     ) -> FacetGrid: ...
+
     # DEPRECATED METHODS
     def plot_indirect_effects(self, *args, **kwargs) -> NoReturn: ...
     def plot_direct_effects(self, *args, **kwargs) -> NoReturn: ...

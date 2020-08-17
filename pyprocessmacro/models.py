@@ -289,7 +289,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
         else:
             raise ValueError(
                 "The covariance type {} is not supported. Please specify 'standard', 'HC0'"
-                "'HC1', 'HC2', or 'HC3".format(errortype)
+                "'HC1', 'HC2', or 'HC3'".format(errortype)
             )
 
         betas = betas.squeeze()
