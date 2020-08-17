@@ -552,32 +552,32 @@ class Process(object):
     }
 
     def __init__(
-        self,
-        data,
-        model=3,
-        modval=None,
-        cluster=None,
-        boot=5000,
-        seed=12345,
-        mc=None,
-        conf=95,
-        effsize=False,
-        jn=False,
-        hc3=False,
-        controls=None,
-        controls_in="all",
-        total=False,
-        contrast=False,
-        center=False,
-        quantile=False,
-        detail=True,
-        percent=False,
-        logit=False,
-        iterate=10000,
-        convergence=0.000_000_01,
-        precision=4,
-        suppr_init=False,
-        **kwargs,
+            self,
+            data,
+            model=3,
+            modval=None,
+            cluster=None,
+            boot=5000,
+            seed=12345,
+            mc=None,
+            conf=95,
+            effsize=False,
+            jn=False,
+            hc3=False,
+            controls=None,
+            controls_in="all",
+            total=False,
+            contrast=False,
+            center=False,
+            quantile=False,
+            detail=True,
+            percent=False,
+            logit=False,
+            iterate=10000,
+            convergence=0.000_000_01,
+            precision=4,
+            suppr_init=False,
+            **kwargs,
     ):
         """
         Initialize a Process model, as defined in Andrew F. Hayes's book 'Introduction to Mediation, Moderation,
@@ -848,7 +848,7 @@ class Process(object):
                 var_kwargs[k] = [v]
             if isinstance(v, list):
                 if ((k != "m") & (len(v) != 1)) or (
-                    (self.model_num <= 3) & (len(v) != 1)
+                        (self.model_num <= 3) & (len(v) != 1)
                 ):
                     raise ValueError(
                         f"Several variable names have been specified for '{k}'. \n"
@@ -1129,6 +1129,10 @@ class Process(object):
         return spot_values
 
     def _gen_direct_effect_model(self):
+        """
+        Generate the Direct Effect Model for the direct path.
+        :return: a DirectEffectModel object, properly initialized.
+        """
         mod_names = self._moderators["x_direct"]
         model_iv = self.outcome_models[self.iv]
         dem = DirectEffectModel(
@@ -1142,6 +1146,10 @@ class Process(object):
         return dem
 
     def _gen_indirect_effect_model(self):
+        """
+        Generate the Parallel Mediation Model for the indirect path.
+        :return: a ParallelMediationModel object, properly initialized.
+        """
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
         data_array = self._data.values
@@ -1163,6 +1171,10 @@ class Process(object):
         return iem
 
     def _print_init(self):
+        """
+        Print the initialization information.
+        :return: None
+        """
         initstr = (
             "Process successfully initialized.\n"
             "Based on the Process Macro by Andrew F. Hayes, Ph.D. (www.afhayes.com)\n\n"
@@ -1231,7 +1243,7 @@ class Process(object):
             [1 if len(term.split("*")) == 3 else 0 for term in terms]
         )  # Find if there is any three-way interaction
 
-        if n_mods_ind == 1: # One single moderator, moderated mediation analysis
+        if n_mods_ind == 1:  # One single moderator, moderated mediation analysis
             return ["MM"]
         elif n_mods_ind == 2:
             if (n_mods_m == 1) or threeway:  # Moderators on two different paths
@@ -1242,7 +1254,19 @@ class Process(object):
             return []
 
     def _parse_moderator_values(self, x, hue, row, col, modval, path):
-
+        """
+        Parse the moderator values supplied to a direct/indirect effect plot. Used in `plot_conditional_direct_effects`
+        and `plot_conditional_indirect_effects`
+        :param x: string
+            Name of the moderator to plot on x-axis
+        :param hue: string
+            Name of the moderator to color-code
+        :param row:
+        :param col:
+        :param modval:
+        :param path:
+        :return:
+        """
         modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         spotlight_values_symb = self._spotlight_values.copy()
 
@@ -1265,6 +1289,7 @@ class Process(object):
             hue1_values = modval_symb.get(huesymb1,
                                           spotlight_values_symb[huesymb1])
             hue2_values = [0]
+
         elif isinstance(hue, list):
             if len(hue) == 2:
                 huevar1 = hue[0]
@@ -1317,7 +1342,6 @@ class Process(object):
                     SyntaxWarning,
                 )
                 modval_parsed[m_var] = [0]
-        print(modval_parsed)
         return modval_parsed
 
     # API
@@ -1363,16 +1387,18 @@ class Process(object):
                 "generated."
             )
         iem = self.indirect_model
+        stv = self._symb_to_var
+
         boot_betas_y = iem._boot_betas_y
         boot_betas_m = iem._boot_betas_m
 
-        cols_y = [self._symb_to_var[t] for t in iem._exog_terms_y]
+        cols_y = [stv[t] for t in iem._exog_terms_y]
         df = pd.DataFrame(boot_betas_y, columns=cols_y)
-        df["___"] = self._symb_to_var["y"]
+        df["___"] = stv["y"]
         for i in range(self.n_meds):
-            cols_m = [self._symb_to_var[t] for t in iem._exog_terms_m]
+            cols_m = [stv[t] for t in iem._exog_terms_m]
             df_m = pd.DataFrame(boot_betas_m[i], columns=cols_m)
-            df_m["___"] = self._symb_to_var[f"m{i + 1}"]
+            df_m["___"] = stv[f"m{i + 1}"]
             df = df.append(df_m)
         df.index.name = "BootSample"
         df.insert(0, "OutcomeName", df["___"].values)
@@ -1380,8 +1406,23 @@ class Process(object):
         return df.reset_index()
 
     def floodlight_indirect_effect(
-        self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
+            self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
     ):
+        """
+        Generate a floodlight analysis to find the Johnson-Neyman point(s) of significance of the indirect effect
+        :param med_name: string
+            The name of the mediator on which to perform the floodlight analysis
+        :param mod_name: string
+            The name of the moderator on which to perform the floodlight analysis
+        :param other_modval: dict of floats or None
+            The conditional value of the other moderator(s). Only a single value can be given for each moderator
+        :param atol: float
+            The absolute error tolerance for convergence
+        :param rtol: float
+            The relative error tolerance for convergence
+        :return: IndirectFloodlightAnalysis
+            An IndirectFloodlightAnalysis object
+        """
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -1437,8 +1478,21 @@ class Process(object):
         )
 
     def floodlight_direct_effect(
-        self, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
+            self, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
     ):
+        """
+        Generate a floodlight analysis to find the Johnson-Neyman point(s) of significance of the direct effect
+        :param mod_name: string
+            The name of the moderator on which to perform the floodlight analysis
+        :param other_modval: dict of floats or None
+            The conditional value of the other moderator(s). Only a single value can be given for each moderator
+        :param atol: float
+            The absolute error tolerance for convergence
+        :param rtol: float
+            The relative error tolerance for convergence
+        :return: DirectFloodlightAnalysis
+            A DirectFloodlightAnalysis object
+        """
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -1582,17 +1636,17 @@ class Process(object):
         return df
 
     def plot_conditional_direct_effects(
-        self,
-        x=None,
-        hue=None,
-        row=None,
-        col=None,
-        modval=None,
-        errstyle="band",
-        hue_format=None,
-        facet_kws=None,
-        plot_kws=None,
-        err_kws=None,
+            self,
+            x=None,
+            hue=None,
+            row=None,
+            col=None,
+            modval=None,
+            errstyle="band",
+            hue_format=None,
+            facet_kws=None,
+            plot_kws=None,
+            err_kws=None,
     ):
         """
         Plot the conditional direct effects of the IV, at specified values of the moderator(s).
@@ -1662,18 +1716,18 @@ class Process(object):
         )
 
     def plot_conditional_indirect_effects(
-        self,
-        med_name=None,
-        x=None,
-        hue=None,
-        row=None,
-        col=None,
-        modval=None,
-        errstyle="band",
-        hue_format=None,
-        facet_kws=None,
-        plot_kws=None,
-        err_kws=None,
+            self,
+            med_name=None,
+            x=None,
+            hue=None,
+            row=None,
+            col=None,
+            modval=None,
+            errstyle="band",
+            hue_format=None,
+            facet_kws=None,
+            plot_kws=None,
+            err_kws=None,
     ):
         """
         Plot the conditional indirect effect for a given mediator, at specified values of the moderator(s).

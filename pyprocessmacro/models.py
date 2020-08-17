@@ -86,7 +86,7 @@ class BaseLogit(object):
         oldparams = np.inf
         newparams = np.repeat(0, self._n_vars)
         while iterations < max_iter and np.any(
-            np.abs(newparams - oldparams) > tolerance
+                np.abs(newparams - oldparams) > tolerance
         ):
             oldparams = newparams
             H = hess(oldparams)
@@ -111,7 +111,7 @@ class BaseOutcomeModel(object):
     """
 
     def __init__(
-        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+            self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
     ):
         """
         Instantiate the model.
@@ -245,7 +245,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
     """
 
     def __init__(
-        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+            self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
     ):
         super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
 
@@ -376,7 +376,7 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
     """
 
     def __init__(
-        self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
+            self, data, endogvar, exogvars, symb_to_ind, symb_to_var, options=None
     ):
         super().__init__(data, endogvar, exogvars, symb_to_ind, symb_to_var, options)
 
@@ -442,14 +442,14 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
             [
                 results[i]
                 for i in [
-                    "minus2ll",
-                    "d",
-                    "pvalue",
-                    "mcfadden",
-                    "coxsnell",
-                    "nagelkerke",
-                    "n",
-                ]
+                "minus2ll",
+                "d",
+                "pvalue",
+                "mcfadden",
+                "coxsnell",
+                "nagelkerke",
+                "n",
+            ]
             ]
         ]
         return pd.DataFrame(
@@ -503,17 +503,17 @@ class ParallelMediationModel(object):
     """
 
     def __init__(
-        self,
-        data,
-        exog_terms_y,
-        exog_terms_m,
-        mod_symb,
-        spot_values,
-        n_meds,
-        analysis_list,
-        symb_to_ind,
-        symb_to_var,
-        options=None,
+            self,
+            data,
+            exog_terms_y,
+            exog_terms_m,
+            mod_symb,
+            spot_values,
+            n_meds,
+            analysis_list,
+            symb_to_ind,
+            symb_to_var,
+            options=None,
     ):
         """
         :param data: array
@@ -958,10 +958,10 @@ class ParallelMediationModel(object):
             e_mod2[i], be_mod2[i], *_ = self._indirect_effect_at(i, dict_mod2)
 
             e_pmm1 = (
-                e_mod1[i] - e_baseline[i]
+                    e_mod1[i] - e_baseline[i]
             )  # Effect of Moderator1 at 1 vs. Moderator1 at 0
             e_pmm2 = (
-                e_mod2[i] - e_baseline[i]
+                    e_mod2[i] - e_baseline[i]
             )  # Effect of Moderator2 at 1 vs. Moderator2 at 0
 
             be_pmm1 = be_mod1[i] - be_baseline[i]  # Bootstrapped effects of...
@@ -1040,7 +1040,7 @@ class ParallelMediationModel(object):
         return {k: v for k, v in zip(["effect", "se", "llci", "ulci"], statistics)}
 
     def _floodlight_analysis(
-        self, med_index, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
+            self, med_index, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
     ):
         """
         Conduct a floodlight analysis of the indirect effect for a specific mediator.
@@ -1103,7 +1103,7 @@ class ParallelMediationModel(object):
 
         for i in range(self._n_meds):
             for j, val in enumerate(
-                mod1_val
+                    mod1_val
             ):  # Conditional moderated mediation effects for Moderator 2
                 # noinspection PyTypeChecker
                 dict_off = dict([[mod1, val], [mod2, 0]])
@@ -1124,7 +1124,7 @@ class ParallelMediationModel(object):
                     )
 
             for j, val in enumerate(
-                mod2_val
+                    mod2_val
             ):  # Conditional moderated mediation effects for Moderator 1
                 # noinspection PyTypeChecker
                 dict_off = dict([[mod2, val], [mod1, 0]])
@@ -1448,7 +1448,7 @@ class ParallelMediationModel(object):
 
 class DirectEffectModel(object):
     def __init__(
-        self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None
+            self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None
     ):
         """
         A container for the direct effect of the variable X on the outcome Y. If the model includes one or several
@@ -1515,14 +1515,14 @@ class DirectEffectModel(object):
         """
         betas, se, llci, ulci = np.zeros((4, len(mod_values)))
         for i, val in enumerate(
-            mod_values
+                mod_values
         ):  # All possible products of level(s) of moderator(s)
             mod_dict = {n: v for n, v in zip(mod_symb, val)}
             betas[i], se[i], llci[i], ulci[i] = self._direct_effect_at(mod_dict)
         return betas, se, llci, ulci
 
     def _floodlight_analysis(
-        self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
+            self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
     ):
         """
         Conduct a floodlight analysis of the direct effect. Search the critical values of mod_symb,
@@ -1654,13 +1654,13 @@ class DirectEffectModel(object):
 
 class BaseFloodlightAnalysis:
     def __init__(
-        self,
-        med_name,
-        mod_name,
-        sig_regions,
-        modval_range,
-        other_modval_name,
-        precision,
+            self,
+            med_name,
+            mod_name,
+            sig_regions,
+            modval_range,
+            other_modval_name,
+            precision,
     ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
@@ -1734,7 +1734,7 @@ class BaseFloodlightAnalysis:
 
 class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
     def __init__(
-        self, mod_name, sig_regions, modval_range, other_modval_name, precision
+            self, mod_name, sig_regions, modval_range, other_modval_name, precision
     ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.
@@ -1756,13 +1756,13 @@ class DirectFloodlightAnalysis(BaseFloodlightAnalysis):
 
 class IndirectFloodlightAnalysis(BaseFloodlightAnalysis):
     def __init__(
-        self,
-        med_name,
-        mod_name,
-        sig_regions,
-        modval_range,
-        other_modval_name,
-        precision,
+            self,
+            med_name,
+            mod_name,
+            sig_regions,
+            modval_range,
+            other_modval_name,
+            precision,
     ):
         """
         A container for a spotlight analysis of the direct effect of the variable X on the outcome Y.

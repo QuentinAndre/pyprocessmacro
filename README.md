@@ -63,6 +63,10 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.7
+**Bug fix on plot_conditional_(in)direct effects**
+An error warning was unnecessarily generated for some variable names. This has now been fixed.
+
 ### 1.0.5
 **Bug fix on newer numpy version**
 A recent numpy version was causing PyProcessMacro to crash on non-float data. Thanks to William Harding for the bug

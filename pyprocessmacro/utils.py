@@ -195,7 +195,7 @@ def gen_moderators(raw_equations, raw_varlist):
 
 
 def plot_errorbars(
-    x, y, yerrlow, yerrhigh, plot_kws=None, err_kws=None, *args, **kwargs
+        x, y, yerrlow, yerrhigh, plot_kws=None, err_kws=None, *args, **kwargs
 ):
     yerr = [yerrlow, yerrhigh]
     err_kws_final = kwargs.copy()
@@ -220,7 +220,7 @@ def plot_errorbands(x, y, llci, ulci, plot_kws=None, err_kws=None, *args, **kwar
 
 
 def plot_conditional_effects(
-    df_effects, x, hue, row, col, errstyle, hue_format, facet_kws, plot_kws, err_kws
+        df_effects, x, hue, row, col, errstyle, hue_format, facet_kws, plot_kws, err_kws
 ):
     if isinstance(hue, list):
         huename = "Hue"
@@ -300,7 +300,7 @@ def plot_conditional_effects(
 
 # noinspection PyTypeChecker
 def find_significance_region(
-    spotlight_func, mod_symb, modval_min, modval_max, modval_other_symb, atol, rtol
+        spotlight_func, mod_symb, modval_min, modval_max, modval_other_symb, atol, rtol
 ):
     mos = modval_other_symb.copy()
     dict_modval_min = {**dict([[mod_symb, modval_min]]), **mos}
@@ -429,7 +429,7 @@ def find_significance_region(
 
 
 def search_mid_range(
-    spotlight_func, min_val, max_val, mod_symb, mod_dict, atol=1e-8, rtol=1e-5
+        spotlight_func, min_val, max_val, mod_symb, mod_dict, atol=1e-8, rtol=1e-5
 ):
     cvals = np.linspace(min_val, max_val, 1000)  # Construct a grid of 1000 points.
     arr_ci = np.empty((1000, 2))
@@ -505,25 +505,25 @@ def search_mid_range(
 
 
 def search_critical_values(
-    spotlight_func,
-    min_val,
-    max_val,
-    mod_symb,
-    mod_dict,
-    slope="positive",
-    region="positive",
-    atol=1e-8,
-    rtol=1e-5,
+        spotlight_func,
+        min_val,
+        max_val,
+        mod_symb,
+        mod_dict,
+        slope="positive",
+        region="positive",
+        atol=1e-8,
+        rtol=1e-5,
 ):
     cval = (max_val + min_val) / 2
     mod_dict[mod_symb] = cval
     b, se, llci, ulci = spotlight_func(mod_dict)
     if region == "positive":
         while not np.isclose(
-            llci, 0, rtol, atol
+                llci, 0, rtol, atol
         ):  # b > 0, we are looking at when LLCI intersects 0
             if (
-                llci < 0
+                    llci < 0
             ):  # If LLCI has crossed zero, moderator value is too small (large if decreasing slope)
                 min_val, max_val = (
                     (cval, max_val) if slope == "positive" else (min_val, cval)
@@ -536,12 +536,12 @@ def search_critical_values(
             mod_dict[mod_symb] = cval
             b, se, llci, ulci = spotlight_func(mod_dict)
             if (
-                prev_cval == cval
+                    prev_cval == cval
             ):  # If we cannot reach 0 with the desired level of precision
                 break
     else:
         while not np.isclose(
-            ulci, 0, rtol, atol
+                ulci, 0, rtol, atol
         ):  # b < 0, we are looking at when ULCI intersects 0
             if ulci < 0:  # If ULCI has not crossed zero, moderator value is too small.
                 min_val, max_val = (
@@ -555,7 +555,7 @@ def search_critical_values(
             mod_dict[mod_symb] = cval
             b, se, llci, ulci = spotlight_func(mod_dict)
             if (
-                prev_cval == cval
+                    prev_cval == cval
             ):  # If we cannot reach 0 with the desired level of precision
                 break
     return cval
