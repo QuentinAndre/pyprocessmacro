@@ -1363,11 +1363,12 @@ class Process(object):
                 print(
                     "\n-------------------------------------------------------------------------\n"
                 )
-                for med_model in m_models:
-                    print(med_model)
-                    print(
-                        "\n-------------------------------------------------------------------------\n"
-                    )
+                if self.model_num > 3:
+                    for med_model in m_models:
+                        print(med_model)
+                        print(
+                            "\n-------------------------------------------------------------------------\n"
+                        )
             if self.indirect_model:
                 print(
                     "\n********************** DIRECT AND INDIRECT EFFECTS **********************\n"
