@@ -6,4 +6,4 @@ from .process import Process
 
 __all__ = ["Process"]
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"

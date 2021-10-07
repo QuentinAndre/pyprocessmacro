@@ -63,6 +63,10 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.11
+**Various doc and bug fixes**
+In particular, the Moderated Mediation index (MM_index_summary()) was not displayed.
+
 ### 1.0.8
 **Bug fix on plot_conditional_(in)direct effects**
 An error warning was unnecessarily generated for some variable names. This has now been fixed.
@@ -306,6 +310,8 @@ gives you access to the following methods:
  calling Process.summary().
 * `coeff_summary()` returns a DataFrame of indirect effect(s) and their SE/CI for each of the mediation
 paths
+* `MM_index_summary()` returns a DataFrame of indices for Moderated Mediation, and their 
+SE/CI, for each of the mediation paths. If the model does not compute a MM, this will return an error.
 * `PMM_index_summary()` returns a DataFrame of indices for Partial Moderated Mediation, and their 
 SE/CI, for each of the moderators and mediation paths. If the model does not compute a PMM, this will return an error.
 * `CMM_index_summary()` returns a DataFrame of indices for Conditional Moderated Mediation, and their 
