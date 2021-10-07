@@ -310,7 +310,7 @@ paths
 SE/CI, for each of the moderators and mediation paths. If the model does not compute a PMM, this will return an error.
 * `CMM_index_summary()` returns a DataFrame of indices for Conditional Moderated Mediation, and their 
 SE/CI, for each of the moderators and mediation paths. If the model does not compute a CMM, this will return an error.
-* `CMM_index_summary()` returns a DataFrame of indices for Moderated Moderated Mediation, and their 
+* `MMM_index_summary()` returns a DataFrame of indices for Moderated Moderated Mediation, and their 
 SE/CI, for each of the mediation paths. If the model does not compute a MMM, this will return an error.
 
 ````python
