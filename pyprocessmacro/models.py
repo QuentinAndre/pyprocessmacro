@@ -1360,7 +1360,7 @@ class ParallelMediationModel(object):
         return df.apply(pd.to_numeric, args=["ignore"])
 
     def MM_index_summary(self):
-        if "MMM" in self._analysis_list:
+        if "MM" in self._analysis_list:
             return self._MM_index_wrapper()
         else:
             raise NotImplementedError(
