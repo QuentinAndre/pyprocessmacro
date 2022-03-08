@@ -1350,7 +1350,7 @@ class Process(object):
         Print the summary of the Process model.
         :return: None
         """
-        with pd.option_context("precision", self.options["precision"]):
+        with pd.option_context("display.precision", self.options["precision"]):
             full_model = self.outcome_models[self.iv]
             m_models = [
                 self.outcome_models.get(med_name) for med_name in self.mediators
