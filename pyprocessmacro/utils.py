@@ -166,7 +166,7 @@ def eval_expression(expr, values=None):
             evaled_term = np.array(
                 [0 if isinstance(elem, str) else elem for elem in term]
             )  # All variables at 0
-        evaled_expr[i] = np.product(
+        evaled_expr[i] = np.prod(
             evaled_term.astype(float)
         )  # Gradient is the product of values
     return evaled_expr
