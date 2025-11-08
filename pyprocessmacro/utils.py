@@ -30,8 +30,8 @@ def bias_corrected_ci(estimate, samples, conf=95):
     Zci = z_score(conf)
     Zlow, Zhigh = -Zci + 2 * Z, Zci + 2 * Z
     plow, phigh = norm._cdf(Zlow), norm._cdf(Zhigh)
-    llci = np.percentile(samples, plow * 100, interpolation="lower")
-    ulci = np.percentile(samples, phigh * 100, interpolation="higher")
+    llci = np.percentile(samples, plow * 100, method="lower")
+    ulci = np.percentile(samples, phigh * 100, method="higher")
     return llci, ulci
 
 
