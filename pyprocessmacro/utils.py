@@ -30,8 +30,8 @@ def bias_corrected_ci(estimate, samples, conf=95):
     Zci = z_score(conf)
     Zlow, Zhigh = -Zci + 2 * Z, Zci + 2 * Z
     plow, phigh = norm._cdf(Zlow), norm._cdf(Zhigh)
-    llci = np.percentile(samples, plow * 100, interpolation="lower")
-    ulci = np.percentile(samples, phigh * 100, interpolation="higher")
+    llci = np.percentile(samples, plow * 100, method="lower")
+    ulci = np.percentile(samples, phigh * 100, method="higher")
     return llci, ulci
 
 
@@ -166,7 +166,7 @@ def eval_expression(expr, values=None):
             evaled_term = np.array(
                 [0 if isinstance(elem, str) else elem for elem in term]
             )  # All variables at 0
-        evaled_expr[i] = np.product(
+        evaled_expr[i] = np.prod(
             evaled_term.astype(float)
         )  # Gradient is the product of values
     return evaled_expr

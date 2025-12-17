@@ -1185,7 +1185,7 @@ class ParallelMediationModel(object):
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
         # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return df.apply(lambda s: pd.to_numeric(s, errors='coerce').fillna(s))
 
     def _simple_ind_effects_wrapper(self):
         """
@@ -1219,7 +1219,7 @@ class ParallelMediationModel(object):
         cols = ["", "Effect", "Boot SE", "BootLLCI", "BootULCI"]
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
         # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return df.apply(lambda s: pd.to_numeric(s, errors='coerce').fillna(s))
 
     def _MM_index_wrapper(self):
         """

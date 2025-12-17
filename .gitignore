@@ -1,0 +1,36 @@
+# PyCharm specific files
+.idea/
+*.iml
+*.iws
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.installed.cfg
+build/
+dist/
+venv/
+.venv/
+env/
+.env/
+
+# uv specific files and directories
+# uv automatically creates .gitignore files within its generated directories like 'dist' and virtual environments,
+# so explicit entries for these might not be strictly necessary, but including them ensures consistency.
+uv.lock # If this is a library project and you don't want to commit the lock file
+
+# General OS files
+.DS_Store
+Thumbs.db
+
+# Other common ignored files
+*.log
+pip-log.txt
+htmlcov/
+.coverage
+.coverage.*
+.cache/

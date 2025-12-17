@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
 import pytest
-from ..pyprocessmacro import Process
+from pyprocessmacro import Process
 from io import StringIO
+import os
 
 MODELS_LIST = [5] + [i for i in range(7, 73)] + [75, 76]
 
+# Get the directory where this test file is located
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_direct_effect(txt):
     dir = txt.split("Direct effect of X on Y")[1].split("\n\n")[0]
@@ -38,11 +41,11 @@ def get_indirect_effect(txt):
     return indirdata
 
 def get_ols_accuracy(model_num):
-    with open("Results/Results_OLS_Model{}.txt".format(model_num)) as f:
+    with open(os.path.join(TEST_DIR, "Results/Results_OLS_Model{}.txt".format(model_num))) as f:
         spssoutput = f.read().split("******************** DIRECT AND INDIRECT EFFECTS *************************\n")[1]
 
-    data = pd.read_csv("Data/Data_Model{}.csv".format(model_num))
-    varlist = open("Data/Varlist_Model{}.txt".format(model_num)).read().split(",")
+    data = pd.read_csv(os.path.join(TEST_DIR, "Data/Data_Model{}.csv".format(model_num)))
+    varlist = open(os.path.join(TEST_DIR, "Data/Varlist_Model{}.txt".format(model_num))).read().split(",")
 
     kwargs = {i: i for i in varlist if "m" not in i}
     if ("m1" in varlist) & (model_num > 3):
@@ -85,11 +88,11 @@ def get_ols_accuracy(model_num):
     return direffects, indireffects, indirboots
 
 def get_logit_accuracy(model_num):
-    with open("Results/Results_Logit_Model{}.txt".format(model_num)) as f:
+    with open(os.path.join(TEST_DIR, "Results/Results_Logit_Model{}.txt".format(model_num))) as f:
         spssoutput = f.read().split("******************** DIRECT AND INDIRECT EFFECTS *************************\n")[1]
 
-    data = pd.read_csv("Data/Data_Model{}.csv".format(model_num))
-    varlist = open("Data/Varlist_Model{}.txt".format(model_num)).read().split(",")
+    data = pd.read_csv(os.path.join(TEST_DIR, "Data/Data_Model{}.csv".format(model_num)))
+    varlist = open(os.path.join(TEST_DIR, "Data/Varlist_Model{}.txt".format(model_num))).read().split(",")
     varlist = [i if i != "y" else "y2" for i in varlist]
     kwargs = {i: i for i in varlist if "m" not in i}
     if ("m1" in varlist) & (model_num > 3):
