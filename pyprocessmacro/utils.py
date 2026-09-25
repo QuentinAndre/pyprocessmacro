@@ -137,6 +137,9 @@ def fast_optimize(endog, exog, n_obs=0, n_vars=0, max_iter=10000, tolerance=1e-1
             f"The logistic regression did not converge in {max_iter} iterations "
             "(increase 'iterate', relax 'convergence', or check the outcome for separation)."
         )
+    if np.all(np.abs(endog - logit_cdf(dot(exog, newparams))) < 1e-8):
+        # Saturated fit: the score is exactly zero, so the loop above "converges" to huge coefficients.
+        raise ConvergenceError("The logistic regression is perfectly separated: every outcome is predicted exactly, so the coefficients are not identified.")
     return newparams
 
 

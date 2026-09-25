@@ -122,6 +122,9 @@ class BaseLogit(object):
                 f"The logistic regression did not converge in {max_iter} iterations "
                 "(increase 'iterate', relax 'convergence', or check the outcome for separation)."
             )
+        if np.all(np.abs(self._endog - self._cdf(dot(self._exog, newparams))) < 1e-8):
+            # Saturated fit: the score is exactly zero, so the loop above "converges" to huge coefficients.
+            raise ConvergenceError("The logistic regression is perfectly separated: every outcome is predicted exactly, so the coefficients are not identified.")
         return newparams
 
 

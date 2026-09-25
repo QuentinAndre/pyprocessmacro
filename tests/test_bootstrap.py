@@ -94,3 +94,20 @@ def test_separable_resample_is_flagged_as_failed():
 
 
 
+
+
+def test_perfect_separation_is_reported_even_when_the_score_vanishes():
+    from pyprocessmacro.utils import ConvergenceError, fast_optimize
+
+    n = 60
+    x = np.linspace(-3, 3, n)
+    exog = np.column_stack([np.ones(n), x])
+    endog = (x > 0).astype(float)
+    with pytest.raises(ConvergenceError):
+        fast_optimize(endog, exog, n_obs=n, n_vars=2, max_iter=5000, tolerance=1e-10)
+    # A saturated but "converged" batch is flagged too.
+    params = np.array([[0.0, 1000.0]])  # predicts every outcome to within 1e-8 on this grid
+    fitted = bs._logit_cdf(np.einsum("cnk,ck->cn", exog[None], params))
+    assert np.abs(endog[None] - fitted).max() < 1e-8
+    _, failed = bs._batch_logit(endog[None], exog[None], max_iter=0, tolerance=1e-10)
+    assert failed.tolist() == [True]

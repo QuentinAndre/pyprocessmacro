@@ -28,6 +28,8 @@ Additive: nothing written against 2.0 stops working.
 
 ### Fixed
 
+- A perfectly separated logistic regression raises `ConvergenceError` on every platform. On numpy 1.26 the Newton-Raphson loop could reach a saturated fit, where the score is exactly zero, and return huge coefficients as if it had converged.
+
 ## [2.0.0] - 2026-09-25
 
 Major release, tracked in the
