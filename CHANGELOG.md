@@ -17,6 +17,7 @@ Some reported values change in this release; see the migration notes in
 - No index of moderated mediation is reported when a moderator sits on both the X-to-M and the M-to-Y paths (models 58 to 73, 75 and 76), matching PROCESS. The indirect effect is quadratic in such a moderator and the previously reported values were not Hayes's indices (#43).
 - `modval` raises a `ValueError` naming any key that is not a moderator of the model, in the constructor and in the plotting methods; misspelled names were silently ignored (#46).
 - Passing `jn=True`, `effsize=True` or `mc=True` now warns that the option is not supported; the warnings never fired. Unsupported PROCESS options such as `normal` warn with a visible `UserWarning` instead of a hidden `DeprecationWarning`, and an unknown keyword argument raises a `TypeError` instead of being ignored (#47).
+- A logistic regression that diverges or does not converge raises `pyprocessmacro.ConvergenceError` instead of returning garbage silently; failed bootstrap resamples are counted for that reason too, and the bootstrap gives up with a clear error once more resamples failed than were requested. Bias-corrected intervals stay finite when every draw falls on one side of the estimate (#49).
 
 ### Fixed
 

@@ -312,3 +312,45 @@ def test_import_does_not_change_warning_filters():
         "assert warnings.filters == before, (before, warnings.filters)"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+# --- #49: non-convergence is reported, bootstrap failures are capped ---------------------------
+
+
+def test_separated_logit_raises_convergence_error(fit):
+    from pyprocessmacro import ConvergenceError
+
+    n = 60
+    rng = np.random.default_rng(5)
+    effort = np.linspace(-3, 3, n)
+    df = pd.DataFrame(dict(effort=effort, med1=0.5 * effort + rng.normal(size=n), binary=(effort > 0).astype(int)))
+    with pytest.raises(ConvergenceError):
+        fit(4, df=df, x="effort", m=["med1"], y="binary", logit=True, boot=10, iterate=300)
+
+
+def test_bootstrap_gives_up_after_too_many_failures(fit, monkeypatch):
+    from numpy.linalg import LinAlgError
+
+    import pyprocessmacro.models as models
+
+    real = models.fast_OLS
+    calls = {"n": 0}
+
+    def flaky(endog, exog):
+        calls["n"] += 1
+        if calls["n"] > 3:  # after the three true fits (outcome, med1, med2) every resample fails
+            raise LinAlgError("singular")
+        return real(endog, exog)
+
+    monkeypatch.setattr(models, "fast_OLS", flaky)
+    with pytest.raises(RuntimeError, match="bootstrap samples failed"):
+        fit(4, boot=20, **SPEC[4])
+
+
+def test_bias_corrected_ci_is_finite_when_draws_fall_on_one_side():
+    from pyprocessmacro.utils import bias_corrected_ci
+
+    samples = np.linspace(1.0, 2.0, 200)
+    low, high = bias_corrected_ci(0.5, samples, conf=95)  # every draw is above the estimate
+    assert np.isfinite([low, high]).all()
+    assert 1.0 <= low <= high <= 2.0
