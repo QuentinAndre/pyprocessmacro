@@ -23,23 +23,19 @@ from .utils import (
 )
 
 
-def _coerce_numeric(df):
+def _summary_table(levels, level_columns, stats, stat_columns):
     """
-    Convert the columns of a summary table that hold numbers stored as strings back to numbers.
-
-    The tables are assembled with np.concatenate, which turns every statistic into a string as soon as a
-    column of names sits next to it. pd.to_numeric(errors="ignore") used to undo that but was removed in
-    pandas 3, so this reproduces its behaviour: convert a column when every entry parses as a number, and
-    leave it untouched otherwise.
+    Assemble a summary table from label columns and numeric statistics, keeping each column's type (#72).
+    :param levels: list of rows of labels and moderator values
+    :param level_columns: their column names
+    :param stats: (n_rows x n_stats) array of statistics
+    :param stat_columns: their column names
     """
-
-    def convert(column):
-        try:
-            return pd.to_numeric(column)
-        except (ValueError, TypeError):
-            return column
-
-    return df.apply(convert)
+    labels = pd.DataFrame(list(levels), columns=level_columns)
+    numbers = pd.DataFrame(np.asarray(stats, dtype=float), columns=stat_columns)
+    table = pd.concat([labels, numbers], axis=1)
+    table.index = [""] * len(table)
+    return table
 
 
 class BaseLogit(object):
@@ -335,6 +331,10 @@ class OLSOutcomeModel(BaseOutcomeModel):
         adjR2 = 1 - (1 - R2) * ((n_obs - 1) / df_e)  # n_vars already counts the constant (#41)
         F = (R2 / df_r) / ((1 - R2) / df_e)
         F_pval = stats.f.sf(F, df_r, df_e)
+        rss = float(dot(resid.T, resid))
+        llf = -n_obs / 2 * (np.log(2 * np.pi) + np.log(rss / n_obs) + 1)
+        aic = 2 * n_vars - 2 * llf
+        bic = n_vars * np.log(n_obs) - 2 * llf
         llci = betas - (se * tcrit)
         ulci = betas + (se * tcrit)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
@@ -356,6 +356,10 @@ class OLSOutcomeModel(BaseOutcomeModel):
             "ulci": ulci,
             "names": names,
             "n": int(n_obs),
+            "llf": llf,
+            "aic": aic,
+            "bic": bic,
+            "cov_type": errortype,
         }
         return estimation_results
 
@@ -445,6 +449,8 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         # thousand observations, which turned both pseudo R-squared into NaN (#42).
         coxsnell = 1 - np.exp(2 * (llnull - llmodel) / self._n_obs)
         nagelkerke = coxsnell / (1 - np.exp(2 * llnull / self._n_obs))
+        aic = 2 * self._n_vars - 2 * llmodel
+        bic = self._n_vars * np.log(self._n_obs) - 2 * llmodel
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
         estimation_results = {
             "betas": betas,
@@ -462,6 +468,12 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
             "pvalue": pvalue,
             "n": int(self._n_obs),
             "names": names,
+            "llf": llmodel,
+            "llnull": llnull,
+            "aic": aic,
+            "bic": bic,
+            "df_model": int(self._n_vars - 1),
+            "cov_type": "hessian",
         }
         return estimation_results
 
@@ -534,6 +546,13 @@ class ParallelMediationModel(object):
     A class describing a parallel mediation model between an endogenous variable Y, one or several mediators M, and a
     set of exogenous predictors for the endogenous variable and the mediators.
     """
+
+    ANALYSIS_NAMES = {
+        "MM": "MODERATED MEDIATION",
+        "PMM": "PARTIAL MODERATED MEDIATION",
+        "MMM": "MODERATED MODERATED MEDIATION",
+        "CMM": "CONDITIONAL MODERATED MEDIATION",
+    }
 
     def __init__(
             self,
@@ -1216,15 +1235,10 @@ class ParallelMediationModel(object):
         ]
         values = med_values + mod_values
 
-        rows_levels = np.array([i for i in product(*values)])
         cols_levels = ["Mediator"] + [
             symb_to_var.get(x, x) for x in self._moderators_symb
         ]
-
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = cols_levels + cols_stats
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        return _coerce_numeric(df)
+        return _summary_table(product(*values), cols_levels, rows_stats, cols_stats)
 
     def _simple_ind_effects_wrapper(self):
         """
@@ -1252,12 +1266,9 @@ class ParallelMediationModel(object):
                 for a, b in combinations(med_names, 2)
             ]
             rows_levels += contrasts
-        rows_levels = np.array(rows_levels).reshape(-1, 1)
-
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = ["", "Effect", "Boot SE", "BootLLCI", "BootULCI"]
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        return _coerce_numeric(df)
+        return _summary_table(
+            [[label] for label in rows_levels], [""], rows_stats, ["Effect", "Boot SE", "BootLLCI", "BootULCI"]
+        )
 
     def _MM_index_wrapper(self):
         """
@@ -1279,14 +1290,7 @@ class ParallelMediationModel(object):
                 for i in range(self._n_meds)
             ]
         ]
-        values = mod_names + med_names
-        rows_levels = np.array([i for i in product(*values)])
-        cols_levels = ["Moderator", "Mediator"]
-
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = cols_levels + cols_stats
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        return _coerce_numeric(df)
+        return _summary_table(product(*(mod_names + med_names)), ["Moderator", "Mediator"], rows_stats, cols_stats)
 
     def _PMM_index_wrapper(self):
         """
@@ -1308,14 +1312,7 @@ class ParallelMediationModel(object):
                 for i in range(self._n_meds)
             ]
         ]
-        values = mod_names + med_names
-        rows_levels = np.array([i for i in product(*values)])
-        cols_levels = ["Moderator", "Mediator"]
-
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = cols_levels + cols_stats
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        return _coerce_numeric(df)
+        return _summary_table(product(*(mod_names + med_names)), ["Moderator", "Mediator"], rows_stats, cols_stats)
 
     def _CMM_index_wrapper(self):
         """
@@ -1341,30 +1338,14 @@ class ParallelMediationModel(object):
         rows_modname = [mod2_name] * len(mod1_values) * self._n_meds + [
             mod1_name
         ] * len(mod2_values) * self._n_meds
-        rows_modname = np.reshape(rows_modname, (-1, 1))
-
-        rows_medname = np.concatenate(
-            [
-                np.repeat(med_names, len(mod1_values)),
-                np.repeat(med_names, len(mod2_values)),
-            ]
+        rows_medname = list(np.repeat(med_names, len(mod1_values))) + list(np.repeat(med_names, len(mod2_values)))
+        rows_modvalues = list(np.tile(mod1_values, self._n_meds)) + list(np.tile(mod2_values, self._n_meds))
+        return _summary_table(
+            zip(rows_modname, rows_medname, [float(v) for v in rows_modvalues]),
+            ["Focal Mod", "Mediator", "Other Mod At"],
+            rows_stats,
+            cols_stats,
         )
-        rows_medname = np.reshape(rows_medname, (-1, 1))
-
-        rows_modvalues = np.concatenate(
-            [np.tile(mod1_values, self._n_meds), np.tile(mod2_values, self._n_meds)]
-        )
-        rows_modvalues = np.reshape(rows_modvalues, (-1, 1))
-
-        cols_levels = ["Focal Mod", "Mediator", "Other Mod At"]
-        rows_levels = np.concatenate(
-            [rows_modname, rows_medname, rows_modvalues], axis=1
-        )
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = cols_levels + cols_stats
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-
-        return _coerce_numeric(df)
 
     def _MMM_index_wrapper(self):
         """
@@ -1385,13 +1366,7 @@ class ParallelMediationModel(object):
                 for i in range(self._n_meds)
             ]
         ]
-        rows_levels = np.array([i for i in product(*med_names)])
-        cols_levels = ["Mediator"]
-
-        rows = np.concatenate([rows_levels, rows_stats], axis=1)
-        cols = cols_levels + cols_stats
-        df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        return _coerce_numeric(df)
+        return _summary_table(product(*med_names), ["Mediator"], rows_stats, cols_stats)
 
     def MM_index_summary(self):
         if "MM" in self._analysis_list:

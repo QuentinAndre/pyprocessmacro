@@ -6,6 +6,24 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Work towards 2.1.0, tracked in the
+[2.1.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/3).
+Additive: nothing written against 2.0 stops working.
+
+### Added
+
+- `Process.tidy()`: every estimate in one long DataFrame with fixed column names (component, outcome, term, moderator, one column per moderator, estimate, std_error, statistic, p_value, conf_low, conf_high, method, conf_level, n_boot), modelled on R's broom (#64).
+- `Process.glance()`: one row of fit statistics per outcome model, including log-likelihood, AIC and BIC, which are also stored in `estimation_results` (#65).
+- `Process.augment()`: the analysis data with fitted values and residuals per outcome model (#66).
+- `Process.summary()` returns the text it prints, `str(process)` gives the same text, and a `Process` object displays its tables as HTML in notebooks (#71).
+- README section on `tidy()`, `glance()`, `augment()` and the `summary()` text.
+
+### Changed
+
+- The printed tables are assembled from typed columns instead of a string array coerced back to numbers; same content, no more `to_numeric` round trip (#72).
+
+### Fixed
+
 ## [2.0.0] - 2026-09-25
 
 Major release, tracked in the

@@ -130,3 +130,38 @@ def test_hc3_flag_is_shorthand_for_cov_type(fit):
         fit(4, boot=50, hc3=True, cov_type="HC1", **SPEC4)
     with pytest.raises(ValueError, match="cov_type"):
         fit(4, boot=50, cov_type="robust", **SPEC4)
+
+
+# --- #65: log-likelihood, AIC and BIC ---------------------------------------------------------------
+
+
+def test_glance_information_criteria_match_statsmodels(fit, data):
+    p = fit(4, x="effort", m=["med1"], y="outcome", boot=50)
+    g = p.glance().set_index("outcome")
+    ols = sm.OLS(data["outcome"], design(data, ["effort", "med1"])).fit()
+    assert g.loc["outcome", "log_likelihood"] == pytest.approx(ols.llf, rel=1e-10)
+    assert g.loc["outcome", "aic"] == pytest.approx(ols.aic, rel=1e-10)
+    assert g.loc["outcome", "bic"] == pytest.approx(ols.bic, rel=1e-10)
+    q = fit(4, x="effort", m=["med1"], y="binary", logit=True, boot=50)
+    g = q.glance().set_index("outcome")
+    logit = sm.Logit(data["binary"], design(data, ["effort", "med1"])).fit(disp=0)
+    assert g.loc["binary", "log_likelihood"] == pytest.approx(logit.llf, rel=1e-6)
+    assert g.loc["binary", "ll_null"] == pytest.approx(logit.llnull, rel=1e-6)
+    assert g.loc["binary", "aic"] == pytest.approx(logit.aic, rel=1e-6)
+    assert g.loc["binary", "bic"] == pytest.approx(logit.bic, rel=1e-6)
+    assert g.loc["binary", "df_model"] == logit.df_model
+
+
+# --- #66: augment against statsmodels -----------------------------------------------------------------
+
+
+def test_augment_matches_statsmodels_fitted_values(fit, data):
+    p = fit(4, x="effort", m=["med1"], y="outcome", boot=50)
+    a = p.augment(outcome="outcome")
+    ols = sm.OLS(data["outcome"], design(data, ["effort", "med1"])).fit()
+    np.testing.assert_allclose(a[".fitted_outcome"].to_numpy(), ols.fittedvalues.to_numpy(), rtol=1e-10)
+    np.testing.assert_allclose(a[".resid_outcome"].to_numpy(), ols.resid.to_numpy(), rtol=1e-8, atol=1e-10)
+    q = fit(4, x="effort", m=["med1"], y="binary", logit=True, boot=50)
+    a = q.augment(outcome="binary")
+    logit = sm.Logit(data["binary"], design(data, ["effort", "med1"])).fit(disp=0)
+    np.testing.assert_allclose(a[".fitted_binary"].to_numpy(), np.asarray(logit.predict()), rtol=1e-5)

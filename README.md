@@ -199,6 +199,8 @@ As you can see, the syntax for PyProcessMacro is (almost) identical to that of P
 
 Once the object is initialized, you can call its `summary()` method to display the estimation results
 
+The standardized result tables (`tidy()`, `glance()`, `augment()`) are described in section 6.
+
 You might have noticed that there is no argument `varlist` in PyProcessMacro. This is because the list of variables 
 is automatically inferred from the variable names given to x, y, m.
 
@@ -611,6 +613,32 @@ g = p.plot_conditional_indirect_effects(med_name="MediationSkills", x="Motivatio
                             plot_kws=plot_kws, err_kws=err_kws, facet_kws=facet_kws)
 ````
 ![PlotCustomKws](images/Ex12.png)
+
+## 6. Standardized results: tidy(), glance() and augment()
+
+Every table PyProcessMacro prints is also available in a standardized form, modelled on R's broom package:
+
+* `tidy()` returns one long DataFrame with one row per estimate and fixed column names: `component`
+  (`outcome`, `direct`, `indirect`, `total`, `contrast`, or `index_mm`, `index_pmm`, `index_mmm`, `index_cmm`),
+  `outcome`, `term`, `moderator`, one column per moderator of the model holding the spotlight value the row is
+  evaluated at, then `estimate`, `std_error`, `statistic`, `p_value`, `conf_low`, `conf_high`, `method`,
+  `conf_level` and `n_boot`. Pass `component=` to keep one kind of row.
+* `glance()` returns one row of fit statistics per outcome model, including the log-likelihood, AIC and BIC.
+* `augment()` returns the analysis data with `.fitted_<outcome>` and `.resid_<outcome>` columns per outcome model.
+
+````python
+p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["MediationSkills"], suppr_init=True)
+
+estimates = p.tidy()                        # every estimate
+indirect = p.tidy("indirect")               # only the conditional indirect effects
+fit = p.glance()                            # R², AIC, BIC, ... per outcome model
+residuals = p.augment(outcome="Success")    # fitted values and residuals of the outcome model
+
+estimates.to_csv("process_model7.csv", index=False)
+````
+
+`summary()` returns the text it prints, so `report = p.summary()` keeps a copy, and a `Process` object displayed at
+the end of a notebook cell shows its tables as HTML.
 
 # 7. About
 PyProcessMacro was developed by Quentin André during his PhD in Marketing at INSEAD Business School, France. 

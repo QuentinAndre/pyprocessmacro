@@ -15,6 +15,7 @@ from .models import (
     IndirectFloodlightAnalysis,
 )
 from .utils import plot_conditional_effects, gen_moderators
+from . import tidy as _tidy
 
 
 class Process(object):
@@ -1417,39 +1418,72 @@ class Process(object):
     # API
     def summary(self):
         """
-        Print the summary of the Process model.
-        :return: None
+        Print the summary of the Process model and return it as a string (#71).
+        :return: str
         """
+        text = self._summary_text()
+        print(text)
+        return text
+
+    def _summary_text(self):
         with pd.option_context("display.precision", self.options["precision"]):
+            parts = []
             full_model = self.outcome_models[self.iv]
             m_models = [
                 self.outcome_models.get(med_name) for med_name in self.mediators
             ]
             if self.options["detail"]:
-                print(
+                parts.append(
                     "\n***************************** OUTCOME MODELS ****************************\n"
                 )
-                print(full_model)
-                print(
+                parts.append(str(full_model))
+                parts.append(
                     "\n-------------------------------------------------------------------------\n"
                 )
                 if self.model_num > 3:
                     for med_model in m_models:
-                        print(med_model)
-                        print(
+                        parts.append(str(med_model))
+                        parts.append(
                             "\n-------------------------------------------------------------------------\n"
                         )
             if self.indirect_model:
-                print(
+                parts.append(
                     "\n********************** DIRECT AND INDIRECT EFFECTS **********************\n"
                 )
-                print(self.direct_model)
-                print(self.indirect_model)
+                parts.append(str(self.direct_model))
+                parts.append(str(self.indirect_model))
             else:
-                print(
+                parts.append(
                     "\n********************** CONDITIONAL EFFECTS **********************\n"
                 )
-                print(self.direct_model)
+                parts.append(str(self.direct_model))
+        return "\n".join(parts)
+
+    def __str__(self):
+        return self._summary_text()
+
+    def _repr_html_(self):
+        """The tables of the summary as HTML, for notebooks (#71)."""
+        precision = self.options["precision"]
+        fmt = f"{{:.{precision}f}}".format
+        html = [f"<h3>PROCESS Model {self.model_num}</h3>"]
+        if self.options["detail"]:
+            for name, model in self.outcome_models.items():
+                html.append(f"<h4>Outcome: {name}</h4>")
+                html.append(model.model_summary().to_html(float_format=fmt))
+                html.append(model.coeff_summary().to_html(float_format=fmt))
+        if self.indirect_model:
+            html.append("<h4>Direct effect(s)</h4>")
+            html.append(self.direct_model.coeff_summary().to_html(float_format=fmt))
+            html.append("<h4>Indirect effect(s)</h4>")
+            html.append(self.indirect_model.coeff_summary().to_html(float_format=fmt))
+            for code in self.indirect_model._analysis_list:
+                html.append(f"<h4>Index of {self.indirect_model.ANALYSIS_NAMES[code].lower()}</h4>")
+                html.append(getattr(self.indirect_model, f"{code}_index_summary")().to_html(float_format=fmt))
+        else:
+            html.append("<h4>Conditional effect(s)</h4>")
+            html.append(self.direct_model.coeff_summary().to_html(float_format=fmt))
+        return "\n".join(html)
 
     def get_bootstrap_estimates(self):
         if not self.has_mediation:
@@ -1476,6 +1510,36 @@ class Process(object):
         df = pd.concat(frames)
         df.index.name = "BootSample"
         return df.reset_index()
+
+    def tidy(self, component=None):
+        """
+        Every estimate of the model in one long DataFrame with fixed column names (#64).
+
+        :param component: None for every row, or one component name or a list of names among "outcome",
+            "direct", "indirect", "total", "contrast", "index_mm", "index_pmm", "index_mmm", "index_cmm".
+        :return: DataFrame with the columns component, outcome, term, moderator, one column per moderator of
+            the model holding the spotlight value the row is evaluated at, estimate, std_error, statistic,
+            p_value, conf_low, conf_high, method, conf_level, n_boot.
+        """
+        return _tidy.tidy(self, component)
+
+    def glance(self):
+        """
+        One row of fit statistics per outcome model (#65): outcome, estimator, cov_type, n, and for OLS
+        r_squared, adj_r_squared, mse, f_statistic, df_model, df_resid, p_value; for logit ll_null,
+        lr_statistic, df_model, p_value, mcfadden, cox_snell, nagelkerke; for both log_likelihood, aic, bic.
+        """
+        return _tidy.glance(self)
+
+    def augment(self, outcome=None):
+        """
+        The analysis data with a `.fitted_<outcome>` and a `.resid_<outcome>` column per outcome model (#66).
+        Rows are those kept after listwise deletion; a logistic outcome appears as the 0/1 recoding it was
+        fitted on, its fitted value is the predicted probability and its residual the response residual.
+
+        :param outcome: None for every outcome model, or the name of one outcome.
+        """
+        return _tidy.augment(self, outcome)
 
     def floodlight_indirect_effect(
             self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
