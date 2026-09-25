@@ -8,6 +8,7 @@ compatibility breakages such as pandas API removals are caught before release.
 import warnings
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -39,14 +40,15 @@ INDEX_NAMES = {
     "CMM": "CONDITIONAL MODERATED MEDIATION",
 }
 
-# Which index tables a model reports today (2.0 revisits the both-path cases, see #43).
+# Which index tables a model reports. Models with a moderator on both paths (58, 75, ...) report none (#43).
 INDEX_MODELS = {
     7: ["MM"],  # one moderator on x -> m
     10: ["PMM"],  # two moderators on x -> m, no three-way term
     12: ["MMM", "CMM"],  # two moderators on x -> m with a three-way term
     14: ["MM"],  # one moderator on m -> y
     21: ["MMM", "CMM"],  # one moderator on each path
-    75: ["PMM"],  # two moderators on both paths, no three-way term
+    58: [],  # the moderator sits on both paths: no index
+    75: [],  # both moderators sit on both paths: no index
 }
 
 
@@ -62,11 +64,16 @@ def test_summary_runs(fit, capsys, model):
         assert "CONDITIONAL EFFECTS" in out
     for analysis in INDEX_MODELS.get(model, []):
         assert f"INDEX OF {INDEX_NAMES[analysis]}" in out
+    if model in INDEX_MODELS and not INDEX_MODELS[model]:
+        assert "INDEX OF" not in out
 
 
 @pytest.mark.parametrize("model", sorted(INDEX_MODELS))
 def test_index_tables_are_numeric(fit, model):
     p = fit(model, **SPEC[model])
+    if not INDEX_MODELS[model]:
+        with pytest.raises(NotImplementedError):
+            p.indirect_model.MM_index_summary()
     for analysis in INDEX_MODELS[model]:
         table = getattr(p.indirect_model, f"{analysis}_index_summary")()
         assert len(table) > 0
@@ -209,3 +216,164 @@ def test_hue_accepts_at_most_two_moderators(fit):
     p = fit(10, **SPEC[10])
     with pytest.raises(ValueError, match="hue"):
         p.plot_conditional_direct_effects(x="motiv", hue=["skill", "skill", "skill"])
+
+
+# --- #44: sample size with missing data ----------------------------------------------------
+
+
+def test_missing_rows_are_counted(fit, data):
+    df = data.copy()
+    df.loc[df.index[:10], "med1"] = np.nan
+    p = fit(4, df=df, x="effort", m=["med1"], y="outcome")
+    assert p.n_obs == len(df) - 10
+    assert p.n_obs_null == 10
+    assert p.outcome_models["outcome"].estimation_results["n"] == len(df) - 10
+    assert "index" not in p._data.columns
+
+
+def test_column_named_index_is_allowed(fit, data):
+    df = data.rename(columns={"med1": "index"})
+    p = fit(4, df=df, x="effort", m=["index"], y="outcome")
+    assert p.mediators == ["index"]
+    assert "index" in p.outcome_models
+
+
+# --- #45: seed handling ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("seed", [0, None, 2**32 - 1])
+def test_seed_accepts_zero_none_and_the_full_range(fit, seed):
+    p = fit(4, seed=seed, **SPEC[4])
+    assert p.get_bootstrap_estimates().shape[0] == p.options["boot"] * 3
+
+
+@pytest.mark.parametrize("seed", [-1, 2**32, 1.5, "12"])
+def test_seed_rejects_invalid_values(fit, seed):
+    with pytest.raises(ValueError, match="seed"):
+        fit(4, seed=seed, **SPEC[4])
+
+
+def test_same_seed_reproduces_bootstrap(fit):
+    a = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
+    b = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
+    pd.testing.assert_frame_equal(a, b)
+
+
+# --- #46: modval names are validated ---------------------------------------------------------
+
+
+def test_modval_rejects_unknown_and_non_moderator_names(fit):
+    with pytest.raises(ValueError, match="nonexistent"):
+        fit(7, modval={"nonexistent": [1, 2]}, **SPEC[7])
+    with pytest.raises(ValueError, match="med1"):
+        fit(7, modval={"med1": [1, 2]}, **SPEC[7])
+    with pytest.raises(ValueError, match="not moderators"):
+        fit(4, modval={"effort": [1]}, **SPEC[4])
+
+
+def test_modval_values_are_used(fit):
+    p = fit(7, modval={"motiv": [-2.0, 2.0]}, **SPEC[7])
+    assert list(p._spotlight_values["w"]) == [-2.0, 2.0]
+    assert sorted(p.indirect_model.coeff_summary()["motiv"].unique()) == [-2.0, 2.0]
+
+
+def test_plot_modval_rejects_unknown_names(fit):
+    p = fit(10, **SPEC[10])
+    with pytest.raises(ValueError, match="nonexistent"):
+        p.plot_conditional_direct_effects(x="motiv", modval={"nonexistent": [1]})
+
+
+# --- #47: unsupported options warn, unknown ones raise -----------------------------------------
+
+
+@pytest.mark.parametrize("option", ["jn", "effsize", "mc", "normal", "varorder", "coeffci", "plot", "save"])
+def test_unsupported_options_warn(fit, option):
+    with pytest.warns(UserWarning, match=option):
+        fit(4, **{option: True}, **SPEC[4])
+
+
+def test_unknown_keyword_arguments_raise(fit):
+    with pytest.raises(TypeError, match="boots"):
+        fit(4, boots=10, **SPEC[4])
+
+
+# --- #48: importing the package leaves the warning filters alone -------------------------------
+
+
+def test_import_does_not_change_warning_filters():
+    import subprocess
+    import sys
+
+    # The dependencies register filters of their own, so import them first and check that
+    # importing the package on top of them changes nothing.
+    code = (
+        "import warnings, numpy, scipy.stats, scipy.special, pandas, matplotlib.pyplot, seaborn; "
+        "before = list(warnings.filters); import pyprocessmacro; "
+        "assert warnings.filters == before, (before, warnings.filters)"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+# --- #49: non-convergence is reported, bootstrap failures are capped ---------------------------
+
+
+def test_separated_logit_raises_convergence_error(fit):
+    from pyprocessmacro import ConvergenceError
+
+    n = 60
+    rng = np.random.default_rng(5)
+    effort = np.linspace(-3, 3, n)
+    df = pd.DataFrame(dict(effort=effort, med1=0.5 * effort + rng.normal(size=n), binary=(effort > 0).astype(int)))
+    with pytest.raises(ConvergenceError):
+        fit(4, df=df, x="effort", m=["med1"], y="binary", logit=True, boot=10, iterate=300)
+
+
+def test_bootstrap_gives_up_after_too_many_failures(fit, monkeypatch):
+    from numpy.linalg import LinAlgError
+
+    import pyprocessmacro.models as models
+
+    real = models.fast_OLS
+    calls = {"n": 0}
+
+    def flaky(endog, exog):
+        calls["n"] += 1
+        if calls["n"] > 3:  # after the three true fits (outcome, med1, med2) every resample fails
+            raise LinAlgError("singular")
+        return real(endog, exog)
+
+    monkeypatch.setattr(models, "fast_OLS", flaky)
+    with pytest.raises(RuntimeError, match="bootstrap samples failed"):
+        fit(4, boot=20, **SPEC[4])
+
+
+def test_bias_corrected_ci_is_finite_when_draws_fall_on_one_side():
+    from pyprocessmacro.utils import bias_corrected_ci
+
+    samples = np.linspace(1.0, 2.0, 200)
+    low, high = bias_corrected_ci(0.5, samples, conf=95)  # every draw is above the estimate
+    assert np.isfinite([low, high]).all()
+    assert 1.0 <= low <= high <= 2.0
+
+
+# --- #50: removed API ---------------------------------------------------------------------------
+
+
+def test_deprecated_plot_methods_and_stubs_are_gone():
+    import glob
+    import os
+
+    import pyprocessmacro
+    from pyprocessmacro import Process
+
+    assert not hasattr(Process, "plot_direct_effects")
+    assert not hasattr(Process, "plot_indirect_effects")
+    assert glob.glob(os.path.join(os.path.dirname(pyprocessmacro.__file__), "*.pyi")) == []
+
+
+# --- #52: dv alias ------------------------------------------------------------------------------
+
+
+def test_dv_names_the_outcome(fit):
+    p = fit(4, **SPEC[4])
+    assert p.dv == p.iv == "outcome"

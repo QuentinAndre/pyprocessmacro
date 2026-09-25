@@ -16,8 +16,10 @@ from .utils import (
     eval_expression,
     bias_corrected_ci,
     z_score,
+    t_score,
     percentile_ci,
     find_significance_region,
+    ConvergenceError,
 )
 
 
@@ -103,14 +105,26 @@ class BaseLogit(object):
             return -self._hessian(params) / self._n_obs
 
         oldparams = np.inf
-        newparams = np.repeat(0, self._n_vars)
+        newparams = np.zeros(self._n_vars)
         while iterations < max_iter and np.any(
                 np.abs(newparams - oldparams) > tolerance
         ):
             oldparams = newparams
-            H = hess(oldparams)
-            newparams = oldparams - dot(inv(H), score(oldparams))
+            try:
+                H = hess(oldparams)
+                newparams = oldparams - dot(inv(H), score(oldparams))
+            except LinAlgError:
+                raise ConvergenceError("The Hessian of the logistic regression is singular.")
             iterations += 1
+            if not np.all(np.isfinite(newparams)):
+                raise ConvergenceError(
+                    "The logistic regression diverged (the outcome may be perfectly separated)."
+                )
+        if np.any(np.abs(newparams - oldparams) > tolerance):
+            raise ConvergenceError(
+                f"The logistic regression did not converge in {max_iter} iterations "
+                "(increase 'iterate', relax 'convergence', or check the outcome for separation)."
+            )
         return newparams
 
 
@@ -286,7 +300,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
         resid = y - dot(x, betas)
         mse = (resid ** 2).sum() / df_e
         sse = dot(resid.T, resid) / df_e
-        errortype = "standard" if self._options["hc3"] is False else "HC3"
+        errortype = self._options.get("cov_type") or ("HC3" if self._options.get("hc3") else "standard")
         if errortype == "standard":
             vcv = np.true_divide(1, n_obs - n_vars) * dot(resid.T, resid) * inv_xx
         elif errortype == "HC0":
@@ -294,7 +308,7 @@ class OLSOutcomeModel(BaseOutcomeModel):
             vcv = dot(dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx)
         elif errortype == "HC1":
             sq_resid = (resid ** 2).squeeze()
-            vcv = np.true_divide(n_obs, n_obs - n_vars - 1) * dot(
+            vcv = np.true_divide(n_obs, n_obs - n_vars) * dot(  # n_vars counts the constant (#52)
                 dot(dot(inv_xx, x.T) * sq_resid, x), inv_xx
             )
         elif errortype == "HC2":
@@ -316,13 +330,13 @@ class OLSOutcomeModel(BaseOutcomeModel):
         t = betas / se
         p = stats.t.sf(np.abs(t), df_e) * 2
         conf = self._options["conf"]
-        zscore = z_score(conf)
+        tcrit = t_score(conf, df_e)  # OLS intervals use the t distribution, as PROCESS does (#40)
         R2 = 1 - resid.var() / y.var()
-        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / (n_obs - n_vars - 1))
+        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / df_e)  # n_vars already counts the constant (#41)
         F = (R2 / df_r) / ((1 - R2) / df_e)
-        F_pval = 1 - stats.f.cdf(F, df_r, df_e)
-        llci = betas - (se * zscore)
-        ulci = betas + (se * zscore)
+        F_pval = stats.f.sf(F, df_r, df_e)
+        llci = betas - (se * tcrit)
+        ulci = betas + (se * tcrit)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
         estimation_results = {
             "betas": betas,
@@ -418,19 +432,19 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
 
         # GOF statistics
         llmodel = self._loglike(betas)
-        lmodel = np.exp(llmodel)
         minus2ll = -2 * llmodel
 
         null_model = NullLogitModel(self._endog, self._options)
         betas_null = null_model._optimize()
         llnull = null_model._loglike(betas_null)
-        lnull = np.exp(llnull)
 
         d = 2 * (llmodel - llnull)
         pvalue = stats.chi2.sf(d, self._n_vars - 1)
         mcfadden = 1 - llmodel / llnull
-        coxsnell = 1 - (lnull / lmodel) ** (2 / self._n_obs)
-        nagelkerke = coxsnell / (1 - lnull ** (2 / self._n_obs))
+        # Likelihood ratios are taken in log space: exp(llnull) underflows to 0 beyond about a
+        # thousand observations, which turned both pseudo R-squared into NaN (#42).
+        coxsnell = 1 - np.exp(2 * (llnull - llmodel) / self._n_obs)
+        nagelkerke = coxsnell / (1 - np.exp(2 * llnull / self._n_obs))
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
         estimation_results = {
             "betas": betas,
@@ -650,6 +664,7 @@ class ParallelMediationModel(object):
         boot_betas_y = np.empty((n_boots, len(self._exog_terms_y)))
         boot_betas_m = np.empty((self._n_meds, n_boots, len(self._exog_terms_m)))
         n_fail_samples = 0
+        max_failures = n_boots  # give up once more resamples failed than were requested (#49)
         boot_ind = 0
         sampler = bootstrap_sampler(self._n_obs, seed)
         while boot_ind < n_boots:
@@ -666,8 +681,14 @@ class ParallelMediationModel(object):
                     m_b = self._compute_betas_m(m_e, m_x)
                     boot_betas_m[j][boot_ind] = m_b
                 boot_ind += 1
-            except LinAlgError:  # Hessian (Logit) or X'X (OLS) cannot be inverted
+            except (LinAlgError, ConvergenceError):  # X'X or the Hessian is singular, or the logit diverged
                 n_fail_samples += 1
+                if n_fail_samples > max_failures:
+                    raise RuntimeError(
+                        f"{n_fail_samples} bootstrap samples failed to estimate before {n_boots} succeeded. "
+                        "The model is probably not estimable on resamples of this data (check for separation, "
+                        "collinearity, or a very small sample)."
+                    )
 
         return boot_betas_y, boot_betas_m, n_fail_samples
 
@@ -1585,9 +1606,12 @@ class DirectEffectModel(object):
             dot(grad, vcv), np.transpose(grad)
         )  # V(Grad(X)) = Grad(X).V(X).Grad'(X)
         se = np.sqrt(var)
-        zscore = z_score(conf)
-        llci = betas - (se * zscore)
-        ulci = betas + (se * zscore)
+        if self._is_logit:
+            crit = z_score(conf)
+        else:  # OLS intervals use the t distribution, as PROCESS does (#40)
+            crit = t_score(conf, self._model.estimation_results["df_e"])
+        llci = betas - (se * crit)
+        ulci = betas + (se * crit)
         return betas, se, llci, ulci
 
     def coeff_summary(self):

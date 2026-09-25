@@ -6,6 +6,42 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-25
+
+Major release, tracked in the
+[2.0.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/2).
+Reported values change in this release; see "Upgrading to 2.0" in
+`README.md`.
+
+### Changed
+
+- Confidence intervals for OLS coefficients and for direct effects now use t critical values with the residual degrees of freedom, as PROCESS does. Intervals were based on z, which made them too narrow in small samples (#40).
+- No index of moderated mediation is reported when a moderator sits on both the X-to-M and the M-to-Y paths (models 58 to 73, 75 and 76), matching PROCESS. The indirect effect is quadratic in such a moderator and the previously reported values were not Hayes's indices (#43).
+- `modval` raises a `ValueError` naming any key that is not a moderator of the model, in the constructor and in the plotting methods; misspelled names were silently ignored (#46).
+- Passing `jn=True`, `effsize=True` or `mc=True` now warns that the option is not supported; the warnings never fired. Unsupported PROCESS options such as `normal` warn with a visible `UserWarning` instead of a hidden `DeprecationWarning`, and an unknown keyword argument raises a `TypeError` instead of being ignored (#47).
+- A logistic regression that diverges or does not converge raises `pyprocessmacro.ConvergenceError` instead of returning garbage silently; failed bootstrap resamples are counted for that reason too, and the bootstrap gives up with a clear error once more resamples failed than were requested. Bias-corrected intervals stay finite when every draw falls on one side of the estimate (#49).
+
+### Fixed
+
+- Adjusted R² of the OLS outcome models used one degree of freedom too many; the F p-value is computed with the survival function so it no longer rounds to exactly zero (#41).
+- Cox-Snell and Nagelkerke pseudo R² of logistic outcome models are computed in log space and no longer become NaN beyond about a thousand observations (#42).
+- The sample size reported after dropping rows with missing values is the number of rows kept; the number of dropped rows was always reported as zero (#44).
+- `seed=0` and `seed=None` are accepted; any integer up to 2**32 - 1 works, and `None` draws a different bootstrap sample on every run (#45).
+- Importing the package no longer resets Python's global warning filters (#48).
+- The HC1 covariance estimator scaled by n/(n-k-1) instead of n/(n-k); it was unreachable before `cov_type` existed (#52).
+
+### Removed
+
+- `plot_direct_effects()` and `plot_indirect_effects()`, which raised a `DeprecationWarning` since 1.0.0. Use `plot_conditional_direct_effects()` and `plot_conditional_indirect_effects()` (#50).
+- The `.pyi` stub files, which were inaccurate and unmaintained; the inline type hints remain (#50).
+
+### Added
+
+- `statsmodels` is a test dependency (`pip install -e .[test]`).
+- The accuracy suite against PROCESS now also covers model 4, the conditional effects of the moderation-only models 1 to 3, and the index tables of every model where PROCESS 2.16 prints one.
+- `cov_type` option selecting the OLS covariance estimator: `"standard"` (default), `"HC0"`, `"HC1"`, `"HC2"` or `"HC3"`; `hc3=True` remains as shorthand for `"HC3"`. `Process.dv` names the outcome variable; `iv`, which held it under a misleading name, is kept for compatibility (#52).
+- README: an "Upgrading to 2.0" section listing every change in reported values and behaviour, and documentation of `cov_type`; the 1.0.4 note no longer calls the default estimator HC0 (#51).
+
 ## [1.0.14] - 2026-09-25
 
 Hotfix release, tracked in the
@@ -63,6 +99,7 @@ Hotfix release, tracked in the
 
 See the version history section of `README.md`.
 
-[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.14...HEAD
+[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.14...2.0.0
 [1.0.14]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.13...1.0.14
 [1.0.13]: https://github.com/QuentinAndre/pyprocessmacro/releases/tag/1.0.13
