@@ -722,10 +722,12 @@ class Process(object):
         # list of variables used
         var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
 
-        self.mediators = var_kwargs.get("m")
-        self.iv = var_kwargs.get("y")
-
+        # _gen_valid_varlist normalizes every variable argument to a list, so the mediator and
+        # outcome names must be read after it runs (#35).
         self.varlist = self._gen_valid_varlist(var_kwargs)
+
+        self.mediators = list(var_kwargs["m"]) if self.model_num > 3 else []
+        self.iv = var_kwargs["y"][0]
 
         # Check the number of mediators supplied to the model:
         if self.model_num > 3:

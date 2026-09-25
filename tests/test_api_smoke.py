@@ -126,3 +126,24 @@ def test_controls_in_modes(fit, mode, in_outcome, in_mediator):
 def test_controls_in_rejects_unknown_mode(fit):
     with pytest.raises(ValueError, match="controls_in"):
         fit(7, controls=["ctrl"], controls_in="both", **SPEC[7])
+
+
+# --- #35: a single mediator given as a string ----------------------------------------------
+
+
+def test_single_mediator_as_string_matches_list(fit, data):
+    df = data.rename(columns={"med1": "mediator"})
+    as_str = fit(4, df=df, x="effort", m="mediator", y="outcome")
+    as_list = fit(4, df=df, x="effort", m=["mediator"], y="outcome")
+    assert as_str.n_meds == as_list.n_meds == 1
+    assert as_str.mediators == as_list.mediators == ["mediator"]
+    assert as_str.iv == "outcome"
+    pd.testing.assert_frame_equal(
+        as_str.indirect_model.coeff_summary(), as_list.indirect_model.coeff_summary()
+    )
+
+
+def test_moderation_only_models_have_no_mediators(fit):
+    p = fit(1, **SPEC[1])
+    assert p.mediators == []
+    assert p.n_meds == 0
