@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [master, "release/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: py${{ matrix.python }} / pandas ${{ matrix.pandas }}.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        pandas: ["2", "3"]
+        exclude:
+          # pandas 2.x has no wheels for Python 3.14.
+          - python: "3.14"
+            pandas: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]" "pandas==${{ matrix.pandas }}.*"
+          python -c "import numpy, pandas, scipy, matplotlib, seaborn; print('numpy', numpy.__version__, '| pandas', pandas.__version__, '| scipy', scipy.__version__, '| matplotlib', matplotlib.__version__, '| seaborn', seaborn.__version__)"
+      - name: Test
+        run: python -m pytest -p no:cacheprovider -q
+
+  minimum-deps:
+    name: py3.11 / minimum dependency versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install lower bounds declared in pyproject.toml
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]" \
+            "numpy==1.26.*" "pandas==2.0.*" "scipy==1.10.*" "matplotlib==3.7.*" "seaborn==0.13.*"
+          python -c "import numpy, pandas, scipy, matplotlib, seaborn; print('numpy', numpy.__version__, '| pandas', pandas.__version__, '| scipy', scipy.__version__, '| matplotlib', matplotlib.__version__, '| seaborn', seaborn.__version__)"
+      - name: Test
+        run: python -m pytest -p no:cacheprovider -q
+
+  build:
+    name: Build and check distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+      - name: Check metadata
+        run: python -m twine check --strict dist/*
+      - name: Verify wheel contents
+        run: |
+          python - <<'EOF'
+          import glob, re, zipfile
+          whl = glob.glob("dist/*.whl")[0]
+          zf = zipfile.ZipFile(whl)
+          names = zf.namelist()
+          leaked = [n for n in names if n.startswith("tests/")]
+          assert not leaked, f"tests package leaked into the wheel: {leaked}"
+          meta = zf.read(next(n for n in names if n.endswith("METADATA"))).decode()
+          requires = re.search(r"^Requires-Python: (.+)$", meta, re.M).group(1)
+          assert requires == ">=3.11", requires
+          print("wheel ok:", whl, "| Requires-Python", requires)
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*

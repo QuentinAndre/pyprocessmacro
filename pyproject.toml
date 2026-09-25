@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyProcessMacro"
+dynamic = ["version"]
+description = "A Python library for moderation, mediation and conditional process analysis. Based on Andrew F. Hayes' Process Macro."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.11"
+authors = [{ name = "Quentin André", email = "quentin.andre@insead.edu" }]
+keywords = [
+  "mediation-analysis",
+  "statistics",
+  "process",
+  "plotting",
+  "data-science",
+  "data-analysis",
+  "data-visualization",
+  "regression-models",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+]
+# Lower bounds are exercised by the "minimum dependency versions" job in CI.
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+  "seaborn>=0.13",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/QuentinAndre/pyprocessmacro"
+Repository = "https://github.com/QuentinAndre/pyprocessmacro"
+Issues = "https://github.com/QuentinAndre/pyprocessmacro/issues"
+Changelog = "https://github.com/QuentinAndre/pyprocessmacro/blob/master/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+# Single source of truth for the version. setuptools reads the literal
+# statically, so the package does not need to be importable at build time.
+version = { attr = "pyprocessmacro.__version__" }
+
+[tool.setuptools.packages.find]
+# Only the library goes into the wheel; the tests package stays out (#29).
+include = ["pyprocessmacro*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "smoke: fast checks of the public API, suitable for every push",
+]
