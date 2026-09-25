@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Work towards 2.1.0, tracked in the
+[2.1.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/3).
+Additive: nothing written against 2.0 stops working.
+
+### Added
+
+- `Process.tidy()`: every estimate in one long DataFrame with fixed column names (component, outcome, term, moderator, one column per moderator, estimate, std_error, statistic, p_value, conf_low, conf_high, method, conf_level, n_boot), modelled on R's broom (#64).
+
+### Changed
+
+### Fixed
+
 ## [2.0.0] - 2026-09-25
 
 Major release, tracked in the

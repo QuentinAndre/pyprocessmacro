@@ -15,6 +15,7 @@ from .models import (
     IndirectFloodlightAnalysis,
 )
 from .utils import plot_conditional_effects, gen_moderators
+from . import tidy as _tidy
 
 
 class Process(object):
@@ -1476,6 +1477,18 @@ class Process(object):
         df = pd.concat(frames)
         df.index.name = "BootSample"
         return df.reset_index()
+
+    def tidy(self, component=None):
+        """
+        Every estimate of the model in one long DataFrame with fixed column names (#64).
+
+        :param component: None for every row, or one component name or a list of names among "outcome",
+            "direct", "indirect", "total", "contrast", "index_mm", "index_pmm", "index_mmm", "index_cmm".
+        :return: DataFrame with the columns component, outcome, term, moderator, one column per moderator of
+            the model holding the spotlight value the row is evaluated at, estimate, std_error, statistic,
+            p_value, conf_low, conf_high, method, conf_level, n_boot.
+        """
+        return _tidy.tidy(self, component)
 
     def floodlight_indirect_effect(
             self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
