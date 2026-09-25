@@ -24,6 +24,7 @@ Work towards 1.0.14, a hotfix release. Tracked in the
 - The wheel no longer installs a top-level `tests` package (#29).
 - `Process.summary()` and the four index summaries no longer fail on pandas 3, where `to_numeric(errors="ignore")` was removed (#32).
 - `get_bootstrap_estimates()` no longer fails on pandas 2 and newer, where `DataFrame.append` was removed (#33).
+- `controls_in="x_to_m"` is accepted again; a typo in the validator rejected it (#34).
 
 ### Added
 

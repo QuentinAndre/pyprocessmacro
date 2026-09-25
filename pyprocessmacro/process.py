@@ -810,7 +810,7 @@ class Process(object):
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["logit"] not in [True, False]:
             errstr += "The option 'logit' must be 'True' or 'False'.\n"
-        if options["controls_in"] not in ["all", "x_to_tm", "all_to_y"]:
+        if options["controls_in"] not in ["all", "x_to_m", "all_to_y"]:
             errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
             errstr += "The option 'modval' must be a dictionary.\n"

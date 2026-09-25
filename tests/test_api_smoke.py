@@ -106,3 +106,23 @@ def test_get_bootstrap_estimates(fit):
 def test_get_bootstrap_estimates_requires_mediation(fit):
     with pytest.raises(NotImplementedError):
         fit(1, **SPEC[1]).get_bootstrap_estimates()
+
+
+# --- #34: controls_in ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "mode, in_outcome, in_mediator",
+    [("all", True, True), ("x_to_m", False, True), ("all_to_y", True, False)],
+)
+def test_controls_in_modes(fit, mode, in_outcome, in_mediator):
+    p = fit(7, controls=["ctrl"], controls_in=mode, **SPEC[7])
+    outcome_terms = p.outcome_models["outcome"].coeff_summary().index
+    mediator_terms = p.outcome_models["med1"].coeff_summary().index
+    assert ("ctrl" in outcome_terms) is in_outcome
+    assert ("ctrl" in mediator_terms) is in_mediator
+
+
+def test_controls_in_rejects_unknown_mode(fit):
+    with pytest.raises(ValueError, match="controls_in"):
+        fit(7, controls=["ctrl"], controls_in="both", **SPEC[7])
