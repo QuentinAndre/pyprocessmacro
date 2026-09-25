@@ -13,6 +13,9 @@ import statsmodels.api as sm
 pytestmark = pytest.mark.smoke
 
 
+SPEC4 = dict(x="effort", m=["med1"], y="outcome")
+
+
 def design(df, columns):
     return sm.add_constant(df[list(columns)])
 
@@ -101,3 +104,29 @@ def test_logit_fit_statistics_match_statsmodels(fit, n):
         assert coeffs.loc[name, "se"] == pytest.approx(ref.bse[ref_name], rel=1e-4)
         assert coeffs.loc[name, "LLCI"] == pytest.approx(ci.loc[ref_name, 0], rel=1e-4)
         assert coeffs.loc[name, "ULCI"] == pytest.approx(ci.loc[ref_name, 1], rel=1e-4)
+
+
+# --- #52: covariance estimators ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cov_type", ["standard", "HC0", "HC1", "HC2", "HC3"])
+def test_ols_covariance_estimators_match_statsmodels(fit, data, cov_type):
+    df = data.iloc[:80]
+    p = fit(4, df=df, x="effort", m=["med1"], y="outcome", boot=50, cov_type=cov_type)
+    ours = p.outcome_models["outcome"].coeff_summary()
+    ref = sm.OLS(df["outcome"], design(df, ["effort", "med1"])).fit(
+        cov_type="nonrobust" if cov_type == "standard" else cov_type
+    )
+    for name, ref_name in [("Cons", "const"), ("effort", "effort"), ("med1", "med1")]:
+        assert ours.loc[name, "coeff"] == pytest.approx(ref.params[ref_name], rel=1e-8)
+        assert ours.loc[name, "se"] == pytest.approx(ref.bse[ref_name], rel=1e-8), cov_type
+
+
+def test_hc3_flag_is_shorthand_for_cov_type(fit):
+    a = fit(4, boot=50, hc3=True, **SPEC4).outcome_models["outcome"].coeff_summary()
+    b = fit(4, boot=50, cov_type="HC3", **SPEC4).outcome_models["outcome"].coeff_summary()
+    pd.testing.assert_frame_equal(a, b)
+    with pytest.raises(ValueError, match="cov_type"):
+        fit(4, boot=50, hc3=True, cov_type="HC1", **SPEC4)
+    with pytest.raises(ValueError, match="cov_type"):
+        fit(4, boot=50, cov_type="robust", **SPEC4)

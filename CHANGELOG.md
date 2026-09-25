@@ -26,13 +26,18 @@ Some reported values change in this release; see the migration notes in
 - The sample size reported after dropping rows with missing values is the number of rows kept; the number of dropped rows was always reported as zero (#44).
 - `seed=0` and `seed=None` are accepted; any integer up to 2**32 - 1 works, and `None` draws a different bootstrap sample on every run (#45).
 - Importing the package no longer resets Python's global warning filters (#48).
+- The HC1 covariance estimator scaled by n/(n-k-1) instead of n/(n-k); it was unreachable before `cov_type` existed (#52).
 
 ### Removed
+
+- `plot_direct_effects()` and `plot_indirect_effects()`, which raised a `DeprecationWarning` since 1.0.0. Use `plot_conditional_direct_effects()` and `plot_conditional_indirect_effects()` (#50).
+- The `.pyi` stub files, which were inaccurate and unmaintained; the inline type hints remain (#50).
 
 ### Added
 
 - `statsmodels` is a test dependency (`pip install -e .[test]`).
 - The accuracy suite against PROCESS now also covers model 4, the conditional effects of the moderation-only models 1 to 3, and the index tables of every model where PROCESS 2.16 prints one.
+- `cov_type` option selecting the OLS covariance estimator: `"standard"` (default), `"HC0"`, `"HC1"`, `"HC2"` or `"HC3"`; `hc3=True` remains as shorthand for `"HC3"`. `Process.dv` names the outcome variable; `iv`, which held it under a misleading name, is kept for compatibility (#52).
 
 ## [1.0.14] - 2026-09-25
 
