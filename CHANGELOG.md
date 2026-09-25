@@ -29,6 +29,9 @@ Some reported values change in this release; see the migration notes in
 
 ### Removed
 
+- `plot_direct_effects()` and `plot_indirect_effects()`, which raised a `DeprecationWarning` since 1.0.0. Use `plot_conditional_direct_effects()` and `plot_conditional_indirect_effects()` (#50).
+- The `.pyi` stub files, which were inaccurate and unmaintained; the inline type hints remain (#50).
+
 ### Added
 
 - `statsmodels` is a test dependency (`pip install -e .[test]`).

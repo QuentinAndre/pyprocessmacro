@@ -1855,16 +1855,3 @@ class Process(object):
             plot_kws,
             err_kws,
         )
-
-    # DEPRECATED METHODS
-    def plot_indirect_effects(self, *args, **kwargs):
-        raise DeprecationWarning(
-            "The method 'plot_indirect_effects' has been deprecated. Please use the equivalent method named \
-            'plot_conditional_indirect_effects."
-        )
-
-    def plot_direct_effects(self, *args, **kwargs):
-        raise DeprecationWarning(
-            "The method 'plot_direct_effects' has been deprecated. Please use the equivalent method named \
-            'plot_conditional_direct_effects."
-        )

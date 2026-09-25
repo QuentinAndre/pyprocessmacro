@@ -354,3 +354,18 @@ def test_bias_corrected_ci_is_finite_when_draws_fall_on_one_side():
     low, high = bias_corrected_ci(0.5, samples, conf=95)  # every draw is above the estimate
     assert np.isfinite([low, high]).all()
     assert 1.0 <= low <= high <= 2.0
+
+
+# --- #50: removed API ---------------------------------------------------------------------------
+
+
+def test_deprecated_plot_methods_and_stubs_are_gone():
+    import glob
+    import os
+
+    import pyprocessmacro
+    from pyprocessmacro import Process
+
+    assert not hasattr(Process, "plot_direct_effects")
+    assert not hasattr(Process, "plot_indirect_effects")
+    assert glob.glob(os.path.join(os.path.dirname(pyprocessmacro.__file__), "*.pyi")) == []
