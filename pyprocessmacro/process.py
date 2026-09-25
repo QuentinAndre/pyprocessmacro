@@ -643,55 +643,65 @@ class Process(object):
         :param precision:
             The number of decimal places to display in the summary of the model results.
         """
-        if kwargs.pop("mc", None):
+        if mc:
             warnings.warn(
-                "The argument 'mc' for Monte-Carlo simulations is not supported",
-                DeprecationWarning,
+                "The argument 'mc' for Monte-Carlo confidence intervals is not supported; "
+                "bootstrap confidence intervals are used.",
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("normal", None):
             warnings.warn(
                 "The argument 'normal' for normal theory tests is not supported. "
                 "Bootstrapped CI are recommended.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("varorder", None):
             warnings.warn(
                 "The argument 'varorder' for normal theory tests is not supported. "
                 "Bootstrapped CI are recommended.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("varlist", None):
             warnings.warn(
                 "The 'varlist' is not required. To specify controls, use the 'controls' arguments",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("coeffci", None):
             warnings.warn(
-                "The argument 'coeffci' is not supported.", DeprecationWarning
+                "The argument 'coeffci' is not supported.",
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("plot", None):
             warnings.warn(
                 "The argument 'plot' is not supported. Check the 'plot_conditional_direct_effects() and"
                 "'plot_conditional_indirect_effects()' methods instead.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("save", None):
             warnings.warn(
                 "The argument 'save' is not supported. Call the 'get_bootstrap_estimates() method to recover"
                 "the bootstrap samples instead.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
-        if kwargs.pop("effsize", None):
+        if effsize:
             warnings.warn(
-                "The argument 'effsize' for effect sizes is not supported yet."
-                "It is coming in future versions of PyProcessMacro.",
-                SyntaxWarning,
+                "The argument 'effsize' for effect sizes is not supported and is ignored.",
+                UserWarning,
+                stacklevel=2,
             )
-        if kwargs.pop("jn", None):
+        if jn:
             warnings.warn(
-                "The argument 'jn' for the Johnson-Neyman region of significance is not supported."
-                "Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
-                DeprecationWarning,
+                "The argument 'jn' for the Johnson-Neyman region of significance is not supported and is "
+                "ignored. Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
+                UserWarning,
+                stacklevel=2,
             )
 
         if model == 6:
@@ -721,6 +731,12 @@ class Process(object):
 
         # Check the congruence between the model specifications, the model number, and the data, and store the final
         # list of variables used
+        unknown_kwargs = set(kwargs) - self.__var_kws__
+        if unknown_kwargs:
+            raise TypeError(
+                f"Process() got unexpected keyword argument(s): {', '.join(sorted(unknown_kwargs))}. "
+                "Variables are x, y, m, w, z, v and q; check the spelling of the options."
+            )
         var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
 
         # _gen_valid_varlist normalizes every variable argument to a list, so the mediator and

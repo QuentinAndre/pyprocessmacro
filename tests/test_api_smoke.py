@@ -281,3 +281,17 @@ def test_plot_modval_rejects_unknown_names(fit):
     p = fit(10, **SPEC[10])
     with pytest.raises(ValueError, match="nonexistent"):
         p.plot_conditional_direct_effects(x="motiv", modval={"nonexistent": [1]})
+
+
+# --- #47: unsupported options warn, unknown ones raise -----------------------------------------
+
+
+@pytest.mark.parametrize("option", ["jn", "effsize", "mc", "normal", "varorder", "coeffci", "plot", "save"])
+def test_unsupported_options_warn(fit, option):
+    with pytest.warns(UserWarning, match=option):
+        fit(4, **{option: True}, **SPEC[4])
+
+
+def test_unknown_keyword_arguments_raise(fit):
+    with pytest.raises(TypeError, match="boots"):
+        fit(4, boots=10, **SPEC[4])
