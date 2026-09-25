@@ -96,7 +96,6 @@ def get_logit_accuracy(model_num):
     data = pd.read_csv(os.path.join(TEST_DIR, "Data/Data_Model{}.csv".format(model_num)))
     with open(os.path.join(TEST_DIR, "Data/Varlist_Model{}.txt".format(model_num))) as f:
         varlist = f.read().split(",")
-    varlist = [i if i != "y" else "y2" for i in varlist]
     kwargs = {i: i for i in varlist if "m" not in i}
     if ("m1" in varlist) & (model_num > 3):
         kwargs["m"] = ["m1", "m2"]
