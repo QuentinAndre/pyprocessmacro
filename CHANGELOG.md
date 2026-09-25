@@ -18,6 +18,7 @@ Additive: nothing written against 2.0 stops working.
 - `Process.summary()` returns the text it prints, `str(process)` gives the same text, and a `Process` object displays its tables as HTML in notebooks (#71).
 - README section on `tidy()`, `glance()`, `augment()` and the `summary()` text.
 - `OutcomeModel.to_statsmodels()` and `Process.to_statsmodels()` refit each outcome model with statsmodels (same design matrix, same covariance estimator) and return the statsmodels results object, giving access to its summaries, contrasts, diagnostics and table formatters. statsmodels is an optional extra: `pip install pyprocessmacro[statsmodels]` (#67).
+- Model 6, serial mediation with two to four mediators in causal order: specific indirect effects through every ordered subset of mediators, labelled by path, plus total and contrasts. Point estimates are checked against products of statsmodels coefficients and the bootstrap against an independent resampler; a PROCESS 2.16 output file for model 6 is not part of the fixtures yet (#69).
 
 ### Changed
 

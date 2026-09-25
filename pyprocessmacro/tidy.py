@@ -7,7 +7,7 @@ fit statistics per outcome model, and augment() the analysis data with fitted va
 All three read the numeric estimation results directly, so they carry exactly the numbers of the
 printed tables under consistent names.
 """
-from itertools import combinations, product
+from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -105,14 +105,8 @@ def tidy(process, component=None):
                 add("indirect", dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
                     boot_method, at=dict(zip(ind_mods, combo)), boot=True)
                 k += 1
-    else:
-        labels = []
-        if process.options["total"]:
-            labels.append(("total", "total"))
-        labels += [("indirect", med) for med in mediators]
-        if process.options["contrast"]:
-            labels += [("contrast", f"{a} vs. {b}") for a, b in combinations(mediators, 2)]
-        for k, (comp, term) in enumerate(labels):
+    else:  # parallel mediators or the serial paths of model 6, labelled by the model
+        for k, (comp, term) in enumerate(indirect.effect_labels):
             add(comp, dv, term, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
                 boot_method, boot=True)
 

@@ -156,3 +156,76 @@ def _batch_logit(endog, exog, max_iter, tolerance):
         active[idx[~finite | converged]] = False
     failed |= active  # still active after max_iter updates: not converged
     return params, failed
+
+
+FAILURE_MESSAGE = (
+    "{n_fail} bootstrap samples failed to estimate before {n_boots} succeeded. The model is probably not "
+    "estimable on resamples of this data (check for separation, collinearity, or a very small sample)."
+)
+
+
+def bootstrap_equations(data, equations, n_boots, seed, max_iter=10000, tolerance=1e-10, chunk_size=None):
+    """
+    Estimate several equations, each with its own design matrix, on n_boots resamples (serial mediation).
+
+    :param equations: list of (endog_ind, exog_inds, logit) triples
+    :return: (list of (n_boots x k_i) arrays, one per equation, n_fail)
+    """
+    data = np.asarray(data, dtype=float)
+    n_obs, n_cols = data.shape
+    if chunk_size is None:
+        chunk_size = int(max(1, min(n_boots, CHUNK_ELEMENTS // max(1, n_obs * n_cols))))
+    sampler = bootstrap_sampler(n_obs, seed)
+    betas = [np.empty((n_boots, len(exog_inds))) for _, exog_inds, _ in equations]
+    filled, n_fail, max_failures = 0, 0, n_boots
+    while filled < n_boots:
+        count = min(chunk_size, n_boots - filled)
+        indices = np.stack([next(sampler) for _ in range(count)])
+        chunk_betas, failed = _fit_equations_chunk(data[indices], equations, max_iter, tolerance)
+        ok = ~failed
+        n_ok = int(ok.sum())
+        for store, estimates in zip(betas, chunk_betas):
+            store[filled:filled + n_ok] = estimates[ok]
+        filled += n_ok
+        n_fail += int(failed.sum())
+        if n_fail > max_failures:
+            raise RuntimeError(FAILURE_MESSAGE.format(n_fail=n_fail, n_boots=n_boots))
+    return betas, n_fail
+
+
+def _fit_equations_chunk(chunk, equations, max_iter, tolerance):
+    failed = np.zeros(chunk.shape[0], dtype=bool)
+    estimates = []
+    try:
+        for endog_ind, exog_inds, logit in equations:
+            endog, exog = chunk[:, :, endog_ind], chunk[:, :, exog_inds]
+            if logit:
+                betas, bad = _batch_logit(endog, exog, max_iter, tolerance)
+            else:
+                betas = _batch_ols(endog[..., None], exog)[..., 0]
+                bad = ~np.isfinite(betas).all(axis=1)
+            estimates.append(betas)
+            failed |= bad
+    except LinAlgError:
+        return _fit_equations_one_by_one(chunk, equations, max_iter, tolerance)
+    return estimates, failed
+
+
+def _fit_equations_one_by_one(chunk, equations, max_iter, tolerance):
+    count = chunk.shape[0]
+    estimates = [np.zeros((count, len(exog_inds))) for _, exog_inds, _ in equations]
+    failed = np.zeros(count, dtype=bool)
+    for i in range(count):
+        sample = chunk[i]
+        try:
+            for store, (endog_ind, exog_inds, logit) in zip(estimates, equations):
+                if logit:
+                    store[i] = fast_optimize(
+                        sample[:, endog_ind], sample[:, exog_inds], n_obs=sample.shape[0],
+                        n_vars=len(exog_inds), max_iter=max_iter, tolerance=tolerance,
+                    )
+                else:
+                    store[i] = fast_OLS(sample[:, endog_ind], sample[:, exog_inds])
+        except (LinAlgError, ConvergenceError):
+            failed[i] = True
+    return estimates, failed
