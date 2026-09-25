@@ -65,6 +65,10 @@ In the current version, the following features have not yet been ported to PyPro
 
 ## Master Versions
 
+### 1.0.12 and later
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ### 1.0.11
 **Various doc and bug fixes**
 In particular, the Moderated Mediation index (MM_index_summary()) was not displayed.
