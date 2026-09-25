@@ -6,9 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Work towards 2.1.0, tracked in the
+## [2.1.0] - 2026-09-25
+
+Additive release, tracked in the
 [2.1.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/3).
-Additive: nothing written against 2.0 stops working.
+Nothing written against 2.0 stops working.
 
 ### Added
 
@@ -27,6 +29,8 @@ Additive: nothing written against 2.0 stops working.
 - The bootstrap fits resamples in batches with stacked linear algebra instead of one Python iteration per resample, which makes mediation models several times faster. The resample indices are drawn exactly as before, so a given seed still reproduces the same draws and, up to floating-point rounding, the same estimates as 2.0 (#68, resolves #75 for this release).
 
 ### Fixed
+
+- A perfectly separated logistic regression raises `ConvergenceError` on every platform. On numpy 1.26 the Newton-Raphson loop could reach a saturated fit, where the score is exactly zero, and return huge coefficients as if it had converged.
 
 ## [2.0.0] - 2026-09-25
 
@@ -121,7 +125,8 @@ Hotfix release, tracked in the
 
 See the version history section of `README.md`.
 
-[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.1.0...HEAD
+[2.1.0]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.14...2.0.0
 [1.0.14]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.13...1.0.14
 [1.0.13]: https://github.com/QuentinAndre/pyprocessmacro/releases/tag/1.0.13

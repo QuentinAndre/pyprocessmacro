@@ -157,6 +157,9 @@ def _batch_logit(endog, exog, max_iter, tolerance):
         failed[idx[~finite]] = True
         active[idx[~finite | converged]] = False
     failed |= active  # still active after max_iter updates: not converged
+    # Saturated fits: every outcome predicted exactly means separation, not convergence.
+    fitted = _logit_cdf(np.einsum("cnk,ck->cn", exog, params))
+    failed |= np.abs(endog - fitted).max(axis=1) < 1e-8
     return params, failed
 
 
