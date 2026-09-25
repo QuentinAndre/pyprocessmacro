@@ -329,20 +329,14 @@ def test_separated_logit_raises_convergence_error(fit):
 
 
 def test_bootstrap_gives_up_after_too_many_failures(fit, monkeypatch):
-    from numpy.linalg import LinAlgError
+    import pyprocessmacro.bootstrap as bs
 
-    import pyprocessmacro.models as models
+    def every_resample_fails(chunk, spec):
+        count = chunk.shape[0]
+        return (np.zeros((count, len(spec.exog_inds_y))), np.zeros((len(spec.inds_m), count, len(spec.exog_inds_m))),
+                np.ones(count, dtype=bool))
 
-    real = models.fast_OLS
-    calls = {"n": 0}
-
-    def flaky(endog, exog):
-        calls["n"] += 1
-        if calls["n"] > 3:  # after the three true fits (outcome, med1, med2) every resample fails
-            raise LinAlgError("singular")
-        return real(endog, exog)
-
-    monkeypatch.setattr(models, "fast_OLS", flaky)
+    monkeypatch.setattr(bs, "_fit_chunk", every_resample_fails)
     with pytest.raises(RuntimeError, match="bootstrap samples failed"):
         fit(4, boot=20, **SPEC[4])
 
