@@ -335,6 +335,10 @@ class OLSOutcomeModel(BaseOutcomeModel):
         adjR2 = 1 - (1 - R2) * ((n_obs - 1) / df_e)  # n_vars already counts the constant (#41)
         F = (R2 / df_r) / ((1 - R2) / df_e)
         F_pval = stats.f.sf(F, df_r, df_e)
+        rss = float(dot(resid.T, resid))
+        llf = -n_obs / 2 * (np.log(2 * np.pi) + np.log(rss / n_obs) + 1)
+        aic = 2 * n_vars - 2 * llf
+        bic = n_vars * np.log(n_obs) - 2 * llf
         llci = betas - (se * tcrit)
         ulci = betas + (se * tcrit)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
@@ -356,6 +360,10 @@ class OLSOutcomeModel(BaseOutcomeModel):
             "ulci": ulci,
             "names": names,
             "n": int(n_obs),
+            "llf": llf,
+            "aic": aic,
+            "bic": bic,
+            "cov_type": errortype,
         }
         return estimation_results
 
@@ -445,6 +453,8 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         # thousand observations, which turned both pseudo R-squared into NaN (#42).
         coxsnell = 1 - np.exp(2 * (llnull - llmodel) / self._n_obs)
         nagelkerke = coxsnell / (1 - np.exp(2 * llnull / self._n_obs))
+        aic = 2 * self._n_vars - 2 * llmodel
+        bic = self._n_vars * np.log(self._n_obs) - 2 * llmodel
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
         estimation_results = {
             "betas": betas,
@@ -462,6 +472,12 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
             "pvalue": pvalue,
             "n": int(self._n_obs),
             "names": names,
+            "llf": llmodel,
+            "llnull": llnull,
+            "aic": aic,
+            "bic": bic,
+            "df_model": int(self._n_vars - 1),
+            "cov_type": "hessian",
         }
         return estimation_results
 

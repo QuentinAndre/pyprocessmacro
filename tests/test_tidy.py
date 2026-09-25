@@ -124,3 +124,24 @@ def test_tidy_component_filter(fit):
     assert set(p.tidy(["direct", "indirect"])["component"]) == {"direct", "indirect"}
     with pytest.raises(ValueError, match="Unknown component"):
         p.tidy("nope")
+
+
+@pytest.mark.parametrize("model", [4, 14])
+def test_glance_matches_model_summary(fit, model):
+    p = fit(model, **SPEC[model])
+    g = p.glance()
+    assert list(g.columns) == GLANCE_COLUMNS
+    assert list(g["outcome"]) == list(p.outcome_models)
+    for _, row in g.iterrows():
+        res = p.outcome_models[row["outcome"]].estimation_results
+        assert row["n"] == res["n"]
+        assert np.isfinite([row["log_likelihood"], row["aic"], row["bic"]]).all()
+        if row["estimator"] == "ols":
+            assert row["r_squared"] == res["R2"] and row["adj_r_squared"] == res["adjR2"]
+            assert row["f_statistic"] == res["F"] and row["p_value"] == res["F_pval"]
+            assert (row["df_model"], row["df_resid"]) == (res["df_r"], res["df_e"])
+            assert np.isnan(row["mcfadden"])
+        else:
+            assert row["mcfadden"] == res["mcfadden"] and row["lr_statistic"] == res["d"]
+            assert row["p_value"] == res["pvalue"] and row["cov_type"] == "hessian"
+            assert np.isnan(row["r_squared"])

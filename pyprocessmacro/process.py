@@ -1490,6 +1490,14 @@ class Process(object):
         """
         return _tidy.tidy(self, component)
 
+    def glance(self):
+        """
+        One row of fit statistics per outcome model (#65): outcome, estimator, cov_type, n, and for OLS
+        r_squared, adj_r_squared, mse, f_statistic, df_model, df_resid, p_value; for logit ll_null,
+        lr_statistic, df_model, p_value, mcfadden, cox_snell, nagelkerke; for both log_likelihood, aic, bic.
+        """
+        return _tidy.glance(self)
+
     def floodlight_indirect_effect(
             self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
     ):
