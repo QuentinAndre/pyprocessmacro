@@ -764,7 +764,8 @@ class Process(object):
         self.outcome_models = self._gen_outcome_models()
 
         # Rename the dictionary of custom spotlight values, and generating the spotlight values.
-        modval_symb = {self._var_to_symb.get(k): v for k, v in modval.items()}
+        self._check_moderator_names(modval, "modval")
+        modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         self._spotlight_values = self._gen_spotlight_values(modval_symb)
 
         # Generate the direct model.
@@ -779,6 +780,20 @@ class Process(object):
         # Show the initialized Process instance.
         if not suppr_init:
             self._print_init()
+
+    def _check_moderator_names(self, names, argument):
+        """
+        Raise a ValueError if any of the names is not a moderator of the model (#46).
+        :param names: iterable of variable names
+        :param argument: the name of the argument being validated, for the error message
+        """
+        moderators = {self._symb_to_var[s] for s in self._moderators["all"]}
+        unknown = [str(n) for n in names if n not in moderators]
+        if unknown:
+            raise ValueError(
+                f"The variable(s) {', '.join(unknown)} in '{argument}' are not moderators of Model "
+                f"{self.model_num}. Moderators of this model: {', '.join(sorted(moderators)) or 'none'}."
+            )
 
     def _gen_valid_options(self, arguments):
         """
@@ -1277,6 +1292,7 @@ class Process(object):
         :param path:
         :return:
         """
+        self._check_moderator_names(modval, "modval")
         modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         spotlight_values_symb = self._spotlight_values.copy()
 

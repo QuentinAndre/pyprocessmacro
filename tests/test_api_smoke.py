@@ -257,3 +257,27 @@ def test_same_seed_reproduces_bootstrap(fit):
     a = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
     b = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
     pd.testing.assert_frame_equal(a, b)
+
+
+# --- #46: modval names are validated ---------------------------------------------------------
+
+
+def test_modval_rejects_unknown_and_non_moderator_names(fit):
+    with pytest.raises(ValueError, match="nonexistent"):
+        fit(7, modval={"nonexistent": [1, 2]}, **SPEC[7])
+    with pytest.raises(ValueError, match="med1"):
+        fit(7, modval={"med1": [1, 2]}, **SPEC[7])
+    with pytest.raises(ValueError, match="not moderators"):
+        fit(4, modval={"effort": [1]}, **SPEC[4])
+
+
+def test_modval_values_are_used(fit):
+    p = fit(7, modval={"motiv": [-2.0, 2.0]}, **SPEC[7])
+    assert list(p._spotlight_values["w"]) == [-2.0, 2.0]
+    assert sorted(p.indirect_model.coeff_summary()["motiv"].unique()) == [-2.0, 2.0]
+
+
+def test_plot_modval_rejects_unknown_names(fit):
+    p = fit(10, **SPEC[10])
+    with pytest.raises(ValueError, match="nonexistent"):
+        p.plot_conditional_direct_effects(x="motiv", modval={"nonexistent": [1]})
