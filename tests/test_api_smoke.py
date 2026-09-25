@@ -39,14 +39,15 @@ INDEX_NAMES = {
     "CMM": "CONDITIONAL MODERATED MEDIATION",
 }
 
-# Which index tables a model reports today (2.0 revisits the both-path cases, see #43).
+# Which index tables a model reports. Models with a moderator on both paths (58, 75, ...) report none (#43).
 INDEX_MODELS = {
     7: ["MM"],  # one moderator on x -> m
     10: ["PMM"],  # two moderators on x -> m, no three-way term
     12: ["MMM", "CMM"],  # two moderators on x -> m with a three-way term
     14: ["MM"],  # one moderator on m -> y
     21: ["MMM", "CMM"],  # one moderator on each path
-    75: ["PMM"],  # two moderators on both paths, no three-way term
+    58: [],  # the moderator sits on both paths: no index
+    75: [],  # both moderators sit on both paths: no index
 }
 
 
@@ -62,11 +63,16 @@ def test_summary_runs(fit, capsys, model):
         assert "CONDITIONAL EFFECTS" in out
     for analysis in INDEX_MODELS.get(model, []):
         assert f"INDEX OF {INDEX_NAMES[analysis]}" in out
+    if model in INDEX_MODELS and not INDEX_MODELS[model]:
+        assert "INDEX OF" not in out
 
 
 @pytest.mark.parametrize("model", sorted(INDEX_MODELS))
 def test_index_tables_are_numeric(fit, model):
     p = fit(model, **SPEC[model])
+    if not INDEX_MODELS[model]:
+        with pytest.raises(NotImplementedError):
+            p.indirect_model.MM_index_summary()
     for analysis in INDEX_MODELS[model]:
         table = getattr(p.indirect_model, f"{analysis}_index_summary")()
         assert len(table) > 0

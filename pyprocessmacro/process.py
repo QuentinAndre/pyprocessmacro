@@ -1224,7 +1224,9 @@ class Process(object):
           1. If the two moderators are on two different paths (X to M, or M to Y): both CMM and MMM are reported.
           2. If the two moderators are on the same path and form a 3-way interaction: both CMM and MMM are reported.
           3. If the two moderators are on the same path and do not form a 3-way: the PMM is reported.
-          4. If at least one of the two moderators is present on both paths: no analysis is reported.
+          4. If a moderator is present on both paths (models 58 to 73, 75 and 76): no index is reported, because
+             the indirect effect is not linear in that moderator and the indices assume it is.
+        MM and PMM match PROCESS 2.16. MMM and CMM follow PROCESS 3 (Hayes, 2018), which 2.16 did not report.
 
         This function returns the list of additional analysis to report. If no additional analysis must be performed,
          this list is empty.
@@ -1238,6 +1240,11 @@ class Process(object):
         m_exogvars = self._equations[1][1]
 
         if n_mods_ind == 0:  # No moderators on indirect path, so no additional analysis.
+            return []
+
+        # Rule 4: a moderator on both the X-to-M and the M-to-Y paths makes the indirect effect quadratic in
+        # that moderator, and every index below assumes linearity. PROCESS reports no index then (#43).
+        if self._moderators["x_indirect"] & self._moderators["m"]:
             return []
 
         terms = y_exogvars + m_exogvars

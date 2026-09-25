@@ -14,6 +14,7 @@ Some reported values change in this release; see the migration notes in
 ### Changed
 
 - Confidence intervals for OLS coefficients and for direct effects now use t critical values with the residual degrees of freedom, as PROCESS does. Intervals were based on z, which made them too narrow in small samples (#40).
+- No index of moderated mediation is reported when a moderator sits on both the X-to-M and the M-to-Y paths (models 58 to 73, 75 and 76), matching PROCESS. The indirect effect is quadratic in such a moderator and the previously reported values were not Hayes's indices (#43).
 
 ### Fixed
 
@@ -25,6 +26,7 @@ Some reported values change in this release; see the migration notes in
 ### Added
 
 - `statsmodels` is a test dependency (`pip install -e .[test]`).
+- The accuracy suite against PROCESS now also covers model 4, the conditional effects of the moderation-only models 1 to 3, and the index tables of every model where PROCESS 2.16 prints one.
 
 ## [1.0.14] - 2026-09-25
 
