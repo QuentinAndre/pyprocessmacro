@@ -19,6 +19,8 @@ Additive: nothing written against 2.0 stops working.
 
 ### Changed
 
+- The printed tables are assembled from typed columns instead of a string array coerced back to numbers; same content, no more `to_numeric` round trip (#72).
+
 ### Fixed
 
 ## [2.0.0] - 2026-09-25

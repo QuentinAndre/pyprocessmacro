@@ -398,3 +398,19 @@ def test_repr_html_has_every_table(fit):
     assert "Index of moderated mediation" in html
     q = fit(1, **SPEC[1])
     assert "Conditional effect" in q._repr_html_()
+
+
+# --- #72: tables are built from typed columns ---------------------------------------------------------
+
+
+def test_tables_have_typed_columns(fit):
+    p = fit(12, **SPEC[12])
+    tables = [p.indirect_model.coeff_summary(), p.indirect_model.MMM_index_summary(), p.indirect_model.CMM_index_summary()]
+    for table in tables:
+        for column in table.columns:
+            if column in ("Mediator", "Moderator", "Focal Mod", ""):
+                assert not pd.api.types.is_numeric_dtype(table[column]), column
+            else:
+                assert pd.api.types.is_float_dtype(table[column]), (column, table[column].dtype)
+    import pyprocessmacro.models as models
+    assert not hasattr(models, "_coerce_numeric")
