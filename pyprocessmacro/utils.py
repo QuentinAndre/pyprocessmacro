@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import dot
 from numpy.linalg import inv, LinAlgError
-from scipy.stats import norm
+from scipy.stats import norm, t
 from seaborn import FacetGrid
 
 
@@ -14,6 +14,15 @@ def z_score(conf):
     :return: The Z-score corresponding to the level of confidence desired.
     """
     return norm.ppf((100 - (100 - conf) / 2) / 100)
+
+
+def t_score(conf, df):
+    """
+    :param conf: Desired level of confidence
+    :param df: Degrees of freedom of the t distribution
+    :return: The critical t value corresponding to the level of confidence desired.
+    """
+    return t.ppf((100 - (100 - conf) / 2) / 100, df)
 
 
 def bias_corrected_ci(estimate, samples, conf=95):
