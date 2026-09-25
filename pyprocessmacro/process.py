@@ -996,9 +996,9 @@ class Process(object):
         """
         # Subset the data to the columns used in the model
         data = self._data[self.varlist].copy()
-        n_obs_before = self._data.shape[0]
-        data = data.dropna().reset_index()
-        n_obs_after = self._data.shape[0]
+        n_obs_before = data.shape[0]
+        data = data.dropna().reset_index(drop=True)
+        n_obs_after = data.shape[0]  # rows that survived dropna (#44)
         n_obs_null = n_obs_before - n_obs_after
 
         # Map each variable name to a unique variable code, and rename the columns in the data.)

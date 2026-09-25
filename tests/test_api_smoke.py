@@ -8,6 +8,7 @@ compatibility breakages such as pandas API removals are caught before release.
 import warnings
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -215,3 +216,23 @@ def test_hue_accepts_at_most_two_moderators(fit):
     p = fit(10, **SPEC[10])
     with pytest.raises(ValueError, match="hue"):
         p.plot_conditional_direct_effects(x="motiv", hue=["skill", "skill", "skill"])
+
+
+# --- #44: sample size with missing data ----------------------------------------------------
+
+
+def test_missing_rows_are_counted(fit, data):
+    df = data.copy()
+    df.loc[df.index[:10], "med1"] = np.nan
+    p = fit(4, df=df, x="effort", m=["med1"], y="outcome")
+    assert p.n_obs == len(df) - 10
+    assert p.n_obs_null == 10
+    assert p.outcome_models["outcome"].estimation_results["n"] == len(df) - 10
+    assert "index" not in p._data.columns
+
+
+def test_column_named_index_is_allowed(fit, data):
+    df = data.rename(columns={"med1": "index"})
+    p = fit(4, df=df, x="effort", m=["index"], y="outcome")
+    assert p.mediators == ["index"]
+    assert "index" in p.outcome_models
