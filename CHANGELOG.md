@@ -17,6 +17,8 @@ Some reported values change in this release; see the migration notes in
 
 ### Fixed
 
+- Adjusted R² of the OLS outcome models used one degree of freedom too many; the F p-value is computed with the survival function so it no longer rounds to exactly zero (#41).
+
 ### Removed
 
 ### Added

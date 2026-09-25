@@ -319,9 +319,9 @@ class OLSOutcomeModel(BaseOutcomeModel):
         conf = self._options["conf"]
         tcrit = t_score(conf, df_e)  # OLS intervals use the t distribution, as PROCESS does (#40)
         R2 = 1 - resid.var() / y.var()
-        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / (n_obs - n_vars - 1))
+        adjR2 = 1 - (1 - R2) * ((n_obs - 1) / df_e)  # n_vars already counts the constant (#41)
         F = (R2 / df_r) / ((1 - R2) / df_e)
-        F_pval = 1 - stats.f.cdf(F, df_r, df_e)
+        F_pval = stats.f.sf(F, df_r, df_e)
         llci = betas - (se * tcrit)
         ulci = betas + (se * tcrit)
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
