@@ -722,10 +722,12 @@ class Process(object):
         # list of variables used
         var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
 
-        self.mediators = var_kwargs.get("m")
-        self.iv = var_kwargs.get("y")
-
+        # _gen_valid_varlist normalizes every variable argument to a list, so the mediator and
+        # outcome names must be read after it runs (#35).
         self.varlist = self._gen_valid_varlist(var_kwargs)
+
+        self.mediators = list(var_kwargs["m"]) if self.model_num > 3 else []
+        self.iv = var_kwargs["y"][0]
 
         # Check the number of mediators supplied to the model:
         if self.model_num > 3:
@@ -810,7 +812,7 @@ class Process(object):
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["logit"] not in [True, False]:
             errstr += "The option 'logit' must be 'True' or 'False'.\n"
-        if options["controls_in"] not in ["all", "x_to_tm", "all_to_y"]:
+        if options["controls_in"] not in ["all", "x_to_m", "all_to_y"]:
             errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
             errstr += "The option 'modval' must be a dictionary.\n"
@@ -1307,17 +1309,28 @@ class Process(object):
                 hue1_values = modval_symb.get(huesymb1,
                                               spotlight_values_symb[huesymb1])
                 hue2_values = [0]
+            else:
+                raise ValueError(
+                    f"'hue' accepts one or two moderator names, got {len(hue)}."
+                )
         else:
             huevar1 = None
             huevar2 = None
             hue1_values = [0]
             hue2_values = [0]
 
-        col_symb = self._var_to_symb[x]
-        col_values = modval_symb.get(col_symb, spotlight_values_symb.get(col_symb, [0]))
+        # Values for the column and row facets (#36)
+        if col is not None:
+            col_symb = self._var_to_symb[col]
+            col_values = modval_symb.get(col_symb, spotlight_values_symb.get(col_symb, [0]))
+        else:
+            col_values = [0]
 
-        row_symb = self._var_to_symb[x]
-        row_values = modval_symb.get(row_symb, spotlight_values_symb.get(row_symb, [0]))
+        if row is not None:
+            row_symb = self._var_to_symb[row]
+            row_values = modval_symb.get(row_symb, spotlight_values_symb.get(row_symb, [0]))
+        else:
+            row_values = [0]
 
         mod_names = [x, huevar1, huevar2, col, row]
         mod_values = [x_values, hue1_values, hue2_values, col_values, row_values]
@@ -1393,17 +1406,18 @@ class Process(object):
         boot_betas_y = iem._boot_betas_y
         boot_betas_m = iem._boot_betas_m
 
-        cols_y = [stv[t] for t in iem._exog_terms_y]
-        df = pd.DataFrame(boot_betas_y, columns=cols_y)
-        df["___"] = stv["y"]
+        frames = []
+        df_y = pd.DataFrame(boot_betas_y, columns=[stv[t] for t in iem._exog_terms_y])
+        df_y.insert(0, "OutcomeName", stv["y"])
+        frames.append(df_y)
+        cols_m = [stv[t] for t in iem._exog_terms_m]
         for i in range(self.n_meds):
-            cols_m = [stv[t] for t in iem._exog_terms_m]
             df_m = pd.DataFrame(boot_betas_m[i], columns=cols_m)
-            df_m["___"] = stv[f"m{i + 1}"]
-            df = df.append(df_m)
+            df_m.insert(0, "OutcomeName", stv[f"m{i + 1}"])
+            frames.append(df_m)
+        # One block per outcome. DataFrame.append was removed in pandas 2.0 (#33).
+        df = pd.concat(frames)
         df.index.name = "BootSample"
-        df.insert(0, "OutcomeName", df["___"].values)
-        del df["___"]
         return df.reset_index()
 
     def floodlight_indirect_effect(
@@ -1432,9 +1446,9 @@ class Process(object):
         if other_modval:
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
-                if not mod_symb:
+                if not symb:
                     raise ValueError(
-                        f"The variable {mod_name} is not a variable in the model."
+                        f"The variable {k} is not a variable in the model."
                     )
                 if isinstance(v, list):
                     raise ValueError(
@@ -1502,9 +1516,9 @@ class Process(object):
         if other_modval:
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
-                if not mod_symb:
+                if not symb:
                     raise ValueError(
-                        f"The variable {mod_name} is not a variable in the model."
+                        f"The variable {k} is not a variable in the model."
                     )
                 if isinstance(v, list):
                     raise ValueError(
@@ -1674,14 +1688,15 @@ class Process(object):
                 If 'ci', confidence intervals are drawn at each discrete value of the moderator on the x-axis
                 If 'none', no confidence interval is drawn.
         :param hue_format: string or None
-            By default, the color-code are labeled:
+            By default, the color-codes are labeled:
                 'Mod1 at val1' if there is one moderator for 'hue'.
-                'Mod2 at val1, Mod2 at val2' if there are two moderators for 'hue'.
-            Alternatively, a string that should be formatted can be passed. The string will receive as arguments:
+                'Mod1 at val1, Mod2 at val2' if there are two moderators for 'hue'.
+            Alternatively, a format string can be passed. It receives the keyword arguments:
                 var1 (the name of the first moderator)
                 var2 (the name of the second moderator, if it exists)
                 val1 (the value of the first moderator)
-                val2 (the value of the second moderator)
+                val2 (the value of the second moderator, if it exists)
+            hue1 and hue2 are accepted as aliases of val1 and val2.
             A valid string would for instance look like this: '{var1} = {val1:.4f}, {var2} = {val2:.4f}'
         :param facet_kws: dict
             A dictionary of arguments that should be passed to the FacetGrid object (such as sharex, sharey, size,
@@ -1757,14 +1772,15 @@ class Process(object):
                 If 'ci', confidence intervals are drawn at each discrete value of the moderator on the x-axis
                 If 'none', no confidence interval is drawn.
         :param hue_format: string or None
-            By default, the color-code are labeled:
-                'Mod1 at val1' if there is two moderator for 'hue'.
-                'Mod2 at val1, Mod2 at val2' if there are two moderators for 'hue'.
-            Alternatively, a string that should be formatted can be passed. The string will receive as arguments:
+            By default, the color-codes are labeled:
+                'Mod1 at val1' if there is one moderator for 'hue'.
+                'Mod1 at val1, Mod2 at val2' if there are two moderators for 'hue'.
+            Alternatively, a format string can be passed. It receives the keyword arguments:
                 var1 (the name of the first moderator)
                 var2 (the name of the second moderator, if it exists)
                 val1 (the value of the first moderator)
-                val2 (the value of the second moderator)
+                val2 (the value of the second moderator, if it exists)
+            hue1 and hue2 are accepted as aliases of val1 and val2.
             A valid string would for instance look like this: '{var1} = {val1:.4f}, {var2} = {val2:.4f}'
         :param facet_kws: dict
             A dictionary of arguments that should be passed to the FacetGrid object (such as sharex, sharey, size,

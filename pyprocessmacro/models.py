@@ -21,6 +21,25 @@ from .utils import (
 )
 
 
+def _coerce_numeric(df):
+    """
+    Convert the columns of a summary table that hold numbers stored as strings back to numbers.
+
+    The tables are assembled with np.concatenate, which turns every statistic into a string as soon as a
+    column of names sits next to it. pd.to_numeric(errors="ignore") used to undo that but was removed in
+    pandas 3, so this reproduces its behaviour: convert a column when every entry parses as a number, and
+    leave it untouched otherwise.
+    """
+
+    def convert(column):
+        try:
+            return pd.to_numeric(column)
+        except (ValueError, TypeError):
+            return column
+
+    return df.apply(convert)
+
+
 class BaseLogit(object):
     """
     A convenience parent class for the methods used in Logistic models.
@@ -1184,8 +1203,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        # noinspection PyTypeChecker
-        return df.apply(lambda s: pd.to_numeric(s, errors='coerce').fillna(s))
+        return _coerce_numeric(df)
 
     def _simple_ind_effects_wrapper(self):
         """
@@ -1218,8 +1236,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = ["", "Effect", "Boot SE", "BootLLCI", "BootULCI"]
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        # noinspection PyTypeChecker
-        return df.apply(lambda s: pd.to_numeric(s, errors='coerce').fillna(s))
+        return _coerce_numeric(df)
 
     def _MM_index_wrapper(self):
         """
@@ -1248,8 +1265,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return _coerce_numeric(df)
 
     def _PMM_index_wrapper(self):
         """
@@ -1278,8 +1294,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return _coerce_numeric(df)
 
     def _CMM_index_wrapper(self):
         """
@@ -1328,8 +1343,7 @@ class ParallelMediationModel(object):
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
 
-        # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return _coerce_numeric(df)
 
     def _MMM_index_wrapper(self):
         """
@@ -1356,8 +1370,7 @@ class ParallelMediationModel(object):
         rows = np.concatenate([rows_levels, rows_stats], axis=1)
         cols = cols_levels + cols_stats
         df = pd.DataFrame(rows, columns=cols, index=[""] * rows.shape[0])
-        # noinspection PyTypeChecker
-        return df.apply(pd.to_numeric, args=["ignore"])
+        return _coerce_numeric(df)
 
     def MM_index_summary(self):
         if "MM" in self._analysis_list:

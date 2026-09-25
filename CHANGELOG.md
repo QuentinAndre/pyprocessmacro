@@ -22,12 +22,21 @@ Work towards 1.0.14, a hotfix release. Tracked in the
 ### Fixed
 
 - The wheel no longer installs a top-level `tests` package (#29).
+- `Process.summary()` and the four index summaries no longer fail on pandas 3, where `to_numeric(errors="ignore")` was removed (#32).
+- `get_bootstrap_estimates()` no longer fails on pandas 2 and newer, where `DataFrame.append` was removed (#33).
+- `controls_in="x_to_m"` is accepted again; a typo in the validator rejected it (#34).
+- A single mediator can be passed as a string; it was treated as a list of characters (#35).
+- `plot_conditional_direct_effects()` and `plot_conditional_indirect_effects()` facet `col` and `row` by the moderator asked for, not by the x-axis moderator (#36).
+- `floodlight_direct_effect()` and `floodlight_indirect_effect()` raise a clear error for an unknown variable in `other_modval` (#37).
+- `hue_format` accepts the documented `val1` and `val2` keys (`hue1` and `hue2` still work), and `hue` rejects more than two moderators (#38).
+- README examples use the current method names, the floodlight example calls the floodlight method, and the install section states the Python floor (#39).
 
 ### Added
 
 - Continuous integration on GitHub Actions across Python 3.11 to 3.14 and
   pandas 2 and 3, plus a build-and-check job (#31).
 - This changelog (#30).
+- Smoke tests of the public API in `tests/test_api_smoke.py`, marked `smoke`.
 
 ## [1.0.13] - 2026-03-31
 
