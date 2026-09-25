@@ -1309,6 +1309,10 @@ class Process(object):
                 hue1_values = modval_symb.get(huesymb1,
                                               spotlight_values_symb[huesymb1])
                 hue2_values = [0]
+            else:
+                raise ValueError(
+                    f"'hue' accepts one or two moderator names, got {len(hue)}."
+                )
         else:
             huevar1 = None
             huevar2 = None
@@ -1684,14 +1688,15 @@ class Process(object):
                 If 'ci', confidence intervals are drawn at each discrete value of the moderator on the x-axis
                 If 'none', no confidence interval is drawn.
         :param hue_format: string or None
-            By default, the color-code are labeled:
+            By default, the color-codes are labeled:
                 'Mod1 at val1' if there is one moderator for 'hue'.
-                'Mod2 at val1, Mod2 at val2' if there are two moderators for 'hue'.
-            Alternatively, a string that should be formatted can be passed. The string will receive as arguments:
+                'Mod1 at val1, Mod2 at val2' if there are two moderators for 'hue'.
+            Alternatively, a format string can be passed. It receives the keyword arguments:
                 var1 (the name of the first moderator)
                 var2 (the name of the second moderator, if it exists)
                 val1 (the value of the first moderator)
-                val2 (the value of the second moderator)
+                val2 (the value of the second moderator, if it exists)
+            hue1 and hue2 are accepted as aliases of val1 and val2.
             A valid string would for instance look like this: '{var1} = {val1:.4f}, {var2} = {val2:.4f}'
         :param facet_kws: dict
             A dictionary of arguments that should be passed to the FacetGrid object (such as sharex, sharey, size,
@@ -1767,14 +1772,15 @@ class Process(object):
                 If 'ci', confidence intervals are drawn at each discrete value of the moderator on the x-axis
                 If 'none', no confidence interval is drawn.
         :param hue_format: string or None
-            By default, the color-code are labeled:
-                'Mod1 at val1' if there is two moderator for 'hue'.
-                'Mod2 at val1, Mod2 at val2' if there are two moderators for 'hue'.
-            Alternatively, a string that should be formatted can be passed. The string will receive as arguments:
+            By default, the color-codes are labeled:
+                'Mod1 at val1' if there is one moderator for 'hue'.
+                'Mod1 at val1, Mod2 at val2' if there are two moderators for 'hue'.
+            Alternatively, a format string can be passed. It receives the keyword arguments:
                 var1 (the name of the first moderator)
                 var2 (the name of the second moderator, if it exists)
                 val1 (the value of the first moderator)
-                val2 (the value of the second moderator)
+                val2 (the value of the second moderator, if it exists)
+            hue1 and hue2 are accepted as aliases of val1 and val2.
             A valid string would for instance look like this: '{var1} = {val1:.4f}, {var2} = {val2:.4f}'
         :param facet_kws: dict
             A dictionary of arguments that should be passed to the FacetGrid object (such as sharex, sharey, size,

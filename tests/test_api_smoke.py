@@ -191,3 +191,21 @@ def test_floodlight_runs(fit):
         regions = analysis.get_significance_regions()
         assert set(regions) == {"Negative on", "Positive on"}
         assert "FLOODLIGHT ANALYSIS" in repr(analysis)
+
+
+# --- #38: hue_format keys ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("fmt", ["{var1} = {val1:.2f}", "{var1} at {hue1:.2f}"])
+def test_hue_format_accepts_documented_and_legacy_keys(fit, fmt):
+    p = fit(10, **SPEC[10])
+    grid = p.plot_conditional_direct_effects(x="motiv", hue="skill", hue_format=fmt)
+    labels = list(grid.hue_names)
+    assert len(labels) == 3 and all(label.startswith("skill") for label in labels), labels
+    plt.close("all")
+
+
+def test_hue_accepts_at_most_two_moderators(fit):
+    p = fit(10, **SPEC[10])
+    with pytest.raises(ValueError, match="hue"):
+        p.plot_conditional_direct_effects(x="motiv", hue=["skill", "skill", "skill"])

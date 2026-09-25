@@ -229,7 +229,9 @@ def plot_conditional_effects(
                 hue_format = "{var1} at {hue1:.2f},  {var2} at {hue2:.2f}"
             df_effects["Hue"] = df_effects[hue].apply(
                 lambda d: hue_format.format(
-                    var1=hue[0], var2=hue[1], hue1=d[hue[0]], hue2=d[hue[1]]
+                    var1=hue[0], var2=hue[1],
+                    val1=d[hue[0]], val2=d[hue[1]],
+                    hue1=d[hue[0]], hue2=d[hue[1]],  # legacy aliases (#38)
                 ),
                 axis=1,
             )
@@ -237,14 +239,14 @@ def plot_conditional_effects(
             if hue_format is None:
                 hue_format = "{var1} at {hue1:.2f}"
             df_effects["Hue"] = df_effects[hue[0]].apply(
-                lambda d: hue_format.format(var1=hue[0], hue1=d)
+                lambda d: hue_format.format(var1=hue[0], val1=d, hue1=d)
             )
     elif isinstance(hue, str):
         huename = "Hue"
         if hue_format is None:
             hue_format = "{var1} at {hue1:.2f}"
         df_effects["Hue"] = df_effects[hue].apply(
-            lambda d: hue_format.format(var1=hue, hue1=d)
+            lambda d: hue_format.format(var1=hue, val1=d, hue1=d)
         )
     else:
         huename = None
