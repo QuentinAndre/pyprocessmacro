@@ -6,9 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Work towards 2.1.0, tracked in the
+## [2.1.0] - 2026-09-25
+
+Additive release, tracked in the
 [2.1.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/3).
-Additive: nothing written against 2.0 stops working.
+Nothing written against 2.0 stops working.
 
 ### Added
 
@@ -123,7 +125,8 @@ Hotfix release, tracked in the
 
 See the version history section of `README.md`.
 
-[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.1.0...HEAD
+[2.1.0]: https://github.com/QuentinAndre/pyprocessmacro/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.14...2.0.0
 [1.0.14]: https://github.com/QuentinAndre/pyprocessmacro/compare/1.0.13...1.0.14
 [1.0.13]: https://github.com/QuentinAndre/pyprocessmacro/releases/tag/1.0.13
