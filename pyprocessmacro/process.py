@@ -1541,6 +1541,13 @@ class Process(object):
         """
         return _tidy.augment(self, outcome)
 
+    def to_statsmodels(self):
+        """
+        Every outcome model refitted with statsmodels, keyed by outcome name (#67). See
+        OutcomeModel.to_statsmodels(); statsmodels is optional (pip install pyprocessmacro[statsmodels]).
+        """
+        return {name: model.to_statsmodels() for name, model in self.outcome_models.items()}
+
     def floodlight_indirect_effect(
             self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
     ):

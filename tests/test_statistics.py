@@ -165,3 +165,52 @@ def test_augment_matches_statsmodels_fitted_values(fit, data):
     a = q.augment(outcome="binary")
     logit = sm.Logit(data["binary"], design(data, ["effort", "med1"])).fit(disp=0)
     np.testing.assert_allclose(a[".fitted_binary"].to_numpy(), np.asarray(logit.predict()), rtol=1e-5)
+
+
+# --- #67: to_statsmodels() ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cov_type", ["standard", "HC3"])
+def test_to_statsmodels_ols_is_a_faithful_twin(fit, data, cov_type):
+    p = fit(4, x="effort", m=["med1"], y="outcome", boot=50, cov_type=cov_type)
+    model = p.outcome_models["outcome"]
+    twin = model.to_statsmodels()
+    ours = model.coeff_summary()
+    ci = twin.conf_int(alpha=0.05)
+    assert list(twin.params.index) == list(ours.index)
+    for name in ours.index:
+        assert ours.loc[name, "coeff"] == pytest.approx(twin.params[name], rel=1e-8)
+        assert ours.loc[name, "se"] == pytest.approx(twin.bse[name], rel=1e-8)
+        assert ours.loc[name, "p"] == pytest.approx(twin.pvalues[name], rel=1e-6)
+        assert ours.loc[name, "LLCI"] == pytest.approx(ci.loc[name, 0], rel=1e-8)
+        assert ours.loc[name, "ULCI"] == pytest.approx(ci.loc[name, 1], rel=1e-8)
+    assert twin.cov_type == ("nonrobust" if cov_type == "standard" else cov_type)
+    assert "OLS Regression Results" in str(twin.summary())
+
+
+def test_to_statsmodels_logit_is_a_faithful_twin(fit):
+    p = fit(4, x="effort", m=["med1"], y="binary", logit=True, boot=50)
+    model = p.outcome_models["binary"]
+    twin = model.to_statsmodels()
+    ours = model.coeff_summary()
+    for name in ours.index:
+        assert ours.loc[name, "coeff"] == pytest.approx(twin.params[name], rel=1e-5)
+        assert ours.loc[name, "se"] == pytest.approx(twin.bse[name], rel=1e-4)
+    assert "Logit Regression Results" in str(twin.summary())
+
+
+def test_process_to_statsmodels_covers_every_outcome(fit):
+    p = fit(7, x="effort", w="motiv", m=["med1", "med2"], y="outcome", boot=50)
+    fits = p.to_statsmodels()
+    assert list(fits) == list(p.outcome_models)
+    contrast = fits["outcome"].t_test("effort + med1 = 0")
+    assert np.isfinite(np.ravel(contrast.effect)[0])
+
+
+def test_to_statsmodels_explains_the_missing_dependency(fit, monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "statsmodels.api", None)
+    p = fit(4, x="effort", m=["med1"], y="outcome", boot=50)
+    with pytest.raises(ImportError, match=r"pyprocessmacro\[statsmodels\]"):
+        p.outcome_models["outcome"].to_statsmodels()

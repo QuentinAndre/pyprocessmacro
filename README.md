@@ -384,6 +384,28 @@ Note that the methods are called from the `indirect_model` object! If you call `
 error.
 
 
+### E. Diagnostics and custom tests with statsmodels
+
+Each outcome model can be handed to [statsmodels](https://www.statsmodels.org), which refits the same design
+matrix with the same covariance estimator and returns the statsmodels results object. From there you get
+`summary()`, custom contrasts with `t_test()` and `wald_test()`, heteroskedasticity and influence diagnostics,
+variance inflation factors, prediction intervals, and the table formatters that accept statsmodels results.
+statsmodels is optional: install it with `pip install pyprocessmacro[statsmodels]`.
+
+````python
+p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["MediationSkills"], suppr_init=True)
+
+fit = p.outcome_models["Success"].to_statsmodels()   # a statsmodels RegressionResults
+print(fit.summary())
+fit.t_test("Effort + MediationSkills = 0")
+
+fits = p.to_statsmodels()                              # every outcome model, keyed by outcome name
+````
+
+For a different question, statsmodels also ships `statsmodels.stats.mediation.Mediation`, Imai-style causal
+mediation with a sensitivity analysis; it estimates a different quantity and is a useful cross-check rather than
+a replacement for the PROCESS approach.
+
 ## 3. Spotlight and Floodlight Analysis 
 
 ### A. Compute direct/indirect effects for specific values (spotlight analysis)

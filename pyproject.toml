@@ -43,6 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+statsmodels = ["statsmodels>=0.14"]
 test = ["pytest>=8", "statsmodels>=0.14"]
 
 [project.urls]

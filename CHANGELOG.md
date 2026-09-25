@@ -17,6 +17,7 @@ Additive: nothing written against 2.0 stops working.
 - `Process.augment()`: the analysis data with fitted values and residuals per outcome model (#66).
 - `Process.summary()` returns the text it prints, `str(process)` gives the same text, and a `Process` object displays its tables as HTML in notebooks (#71).
 - README section on `tidy()`, `glance()`, `augment()` and the `summary()` text.
+- `OutcomeModel.to_statsmodels()` and `Process.to_statsmodels()` refit each outcome model with statsmodels (same design matrix, same covariance estimator) and return the statsmodels results object, giving access to its summaries, contrasts, diagnostics and table formatters. statsmodels is an optional extra: `pip install pyprocessmacro[statsmodels]` (#67).
 
 ### Changed
 
