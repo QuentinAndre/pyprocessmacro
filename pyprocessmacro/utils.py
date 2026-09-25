@@ -139,8 +139,7 @@ def bootstrap_sampler(n_obs, seed=None):
     :param seed: The seed to use for the random number generator
     :return: Bootstrapped indices of size n_obs
     """
-    seeder = np.random.RandomState(seed)
-    seeder.seed(seed)
+    seeder = np.random.RandomState(seed)  # None draws fresh entropy (#45)
     while True:
         yield seeder.randint(n_obs, size=n_obs)
 

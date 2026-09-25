@@ -601,7 +601,8 @@ class Process(object):
         :param boot: int
             The number of bootstrap repetitions for the estimation of the SE and CI in indirect effects.
         :param seed: int
-            The seed to use for bootstrap samples. Specify an integer between 0 and 1e10 for a replicable seed.
+            The seed of the bootstrap sampler: an integer between 0 and 2**32 - 1 for reproducible samples,
+            or None for a different draw on every run.
         :param conf: int
             A value between 51 and 99, representing the desired level of confidence for the confidence intervals
         :param effsize: bool
@@ -793,8 +794,8 @@ class Process(object):
                 "The option 'conf' must be an integer between 50 and 100, exclusive.\n"
             )
 
-        if not isinstance(seed, int) or ((seed <= 0) or (seed >= 1e9)):
-            errstr += "The option 'seed' must be  an integer between 0 and 1 000 000 000, exclusive.\n"
+        if seed is not None and (not isinstance(seed, (int, np.integer)) or not (0 <= seed <= 2**32 - 1)):
+            errstr += "The option 'seed' must be None or an integer between 0 and 2**32 - 1.\n"
 
         if options["contrast"] not in [True, False]:
             errstr += "The option 'contrast' must be 'True' or 'False'.\n"

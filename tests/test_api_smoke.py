@@ -236,3 +236,24 @@ def test_column_named_index_is_allowed(fit, data):
     p = fit(4, df=df, x="effort", m=["index"], y="outcome")
     assert p.mediators == ["index"]
     assert "index" in p.outcome_models
+
+
+# --- #45: seed handling ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("seed", [0, None, 2**32 - 1])
+def test_seed_accepts_zero_none_and_the_full_range(fit, seed):
+    p = fit(4, seed=seed, **SPEC[4])
+    assert p.get_bootstrap_estimates().shape[0] == p.options["boot"] * 3
+
+
+@pytest.mark.parametrize("seed", [-1, 2**32, 1.5, "12"])
+def test_seed_rejects_invalid_values(fit, seed):
+    with pytest.raises(ValueError, match="seed"):
+        fit(4, seed=seed, **SPEC[4])
+
+
+def test_same_seed_reproduces_bootstrap(fit):
+    a = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
+    b = fit(4, seed=7, **SPEC[4]).get_bootstrap_estimates()
+    pd.testing.assert_frame_equal(a, b)

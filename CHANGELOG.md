@@ -21,6 +21,7 @@ Some reported values change in this release; see the migration notes in
 - Adjusted R² of the OLS outcome models used one degree of freedom too many; the F p-value is computed with the survival function so it no longer rounds to exactly zero (#41).
 - Cox-Snell and Nagelkerke pseudo R² of logistic outcome models are computed in log space and no longer become NaN beyond about a thousand observations (#42).
 - The sample size reported after dropping rows with missing values is the number of rows kept; the number of dropped rows was always reported as zero (#44).
+- `seed=0` and `seed=None` are accepted; any integer up to 2**32 - 1 works, and `None` draws a different bootstrap sample on every run (#45).
 
 ### Removed
 
