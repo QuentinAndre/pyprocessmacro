@@ -43,7 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "statsmodels>=0.14"]
 
 [project.urls]
 Homepage = "https://github.com/QuentinAndre/pyprocessmacro"

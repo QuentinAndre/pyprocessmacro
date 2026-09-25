@@ -6,6 +6,23 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Work towards 2.0.0, tracked in the
+[2.0.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/2).
+Some reported values change in this release; see the migration notes in
+`README.md`.
+
+### Changed
+
+- Confidence intervals for OLS coefficients and for direct effects now use t critical values with the residual degrees of freedom, as PROCESS does. Intervals were based on z, which made them too narrow in small samples (#40).
+
+### Fixed
+
+### Removed
+
+### Added
+
+- `statsmodels` is a test dependency (`pip install -e .[test]`).
+
 ## [1.0.14] - 2026-09-25
 
 Hotfix release, tracked in the
