@@ -147,3 +147,26 @@ def test_moderation_only_models_have_no_mediators(fit):
     p = fit(1, **SPEC[1])
     assert p.mediators == []
     assert p.n_meds == 0
+
+
+# --- #36: col and row facets ---------------------------------------------------------------
+
+
+def test_parse_moderator_values_uses_col_and_row(fit):
+    p = fit(10, **SPEC[10])
+    spot_skill = list(p._spotlight_values["z"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        by_col = p._parse_moderator_values(x="motiv", hue=None, row=None, col="skill", modval={}, path="x_direct")
+        by_row = p._parse_moderator_values(x="motiv", hue=None, row="skill", col=None, modval={}, path="x_direct")
+    assert list(by_col["skill"]) == spot_skill
+    assert list(by_row["skill"]) == spot_skill
+    assert len(by_col["motiv"]) == 100  # the x-axis moderator is evaluated on a fine grid
+
+
+@pytest.mark.parametrize("facet, shape", [("col", (1, 3)), ("row", (3, 1))])
+def test_plot_facets_by_second_moderator(fit, facet, shape):
+    p = fit(10, **SPEC[10])
+    grid = p.plot_conditional_direct_effects(x="motiv", **{facet: "skill"})
+    assert grid.axes.shape == shape
+    plt.close("all")

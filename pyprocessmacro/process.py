@@ -1315,11 +1315,18 @@ class Process(object):
             hue1_values = [0]
             hue2_values = [0]
 
-        col_symb = self._var_to_symb[x]
-        col_values = modval_symb.get(col_symb, spotlight_values_symb.get(col_symb, [0]))
+        # Values for the column and row facets (#36)
+        if col is not None:
+            col_symb = self._var_to_symb[col]
+            col_values = modval_symb.get(col_symb, spotlight_values_symb.get(col_symb, [0]))
+        else:
+            col_values = [0]
 
-        row_symb = self._var_to_symb[x]
-        row_values = modval_symb.get(row_symb, spotlight_values_symb.get(row_symb, [0]))
+        if row is not None:
+            row_symb = self._var_to_symb[row]
+            row_values = modval_symb.get(row_symb, spotlight_values_symb.get(row_symb, [0]))
+        else:
+            row_values = [0]
 
         mod_names = [x, huevar1, huevar2, col, row]
         mod_values = [x_values, hue1_values, hue2_values, col_values, row_values]

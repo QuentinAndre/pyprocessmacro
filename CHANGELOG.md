@@ -26,6 +26,7 @@ Work towards 1.0.14, a hotfix release. Tracked in the
 - `get_bootstrap_estimates()` no longer fails on pandas 2 and newer, where `DataFrame.append` was removed (#33).
 - `controls_in="x_to_m"` is accepted again; a typo in the validator rejected it (#34).
 - A single mediator can be passed as a string; it was treated as a list of characters (#35).
+- `plot_conditional_direct_effects()` and `plot_conditional_indirect_effects()` facet `col` and `row` by the moderator asked for, not by the x-axis moderator (#36).
 
 ### Added
 
