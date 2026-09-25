@@ -377,3 +377,24 @@ def test_deprecated_plot_methods_and_stubs_are_gone():
 def test_dv_names_the_outcome(fit):
     p = fit(4, **SPEC[4])
     assert p.dv == p.iv == "outcome"
+
+
+# --- #71: summary() returns its text; notebook representation ---------------------------------------
+
+
+def test_summary_returns_the_printed_text(fit, capsys):
+    p = fit(7, **SPEC[7])
+    text = p.summary()
+    printed = capsys.readouterr().out
+    assert isinstance(text, str) and text.strip() == printed.strip()
+    assert str(p) == text
+    assert "DIRECT AND INDIRECT EFFECTS" in text
+
+
+def test_repr_html_has_every_table(fit):
+    p = fit(7, **SPEC[7])
+    html = p._repr_html_()
+    assert html.count("<table") == 2 * len(p.outcome_models) + 3  # model + coefficients per outcome, direct, indirect, MM index
+    assert "Index of moderated mediation" in html
+    q = fit(1, **SPEC[1])
+    assert "Conditional effect" in q._repr_html_()

@@ -551,6 +551,13 @@ class ParallelMediationModel(object):
     set of exogenous predictors for the endogenous variable and the mediators.
     """
 
+    ANALYSIS_NAMES = {
+        "MM": "MODERATED MEDIATION",
+        "PMM": "PARTIAL MODERATED MEDIATION",
+        "MMM": "MODERATED MODERATED MEDIATION",
+        "CMM": "CONDITIONAL MODERATED MEDIATION",
+    }
+
     def __init__(
             self,
             data,
