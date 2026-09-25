@@ -16,8 +16,6 @@ from .models import (
 )
 from .utils import plot_conditional_effects, gen_moderators
 
-warnings.simplefilter("default")
-
 
 class Process(object):
     __var_kws__ = {"x", "m", "w", "z", "v", "q", "y"}
@@ -601,7 +599,8 @@ class Process(object):
         :param boot: int
             The number of bootstrap repetitions for the estimation of the SE and CI in indirect effects.
         :param seed: int
-            The seed to use for bootstrap samples. Specify an integer between 0 and 1e10 for a replicable seed.
+            The seed of the bootstrap sampler: an integer between 0 and 2**32 - 1 for reproducible samples,
+            or None for a different draw on every run.
         :param conf: int
             A value between 51 and 99, representing the desired level of confidence for the confidence intervals
         :param effsize: bool
@@ -642,55 +641,65 @@ class Process(object):
         :param precision:
             The number of decimal places to display in the summary of the model results.
         """
-        if kwargs.pop("mc", None):
+        if mc:
             warnings.warn(
-                "The argument 'mc' for Monte-Carlo simulations is not supported",
-                DeprecationWarning,
+                "The argument 'mc' for Monte-Carlo confidence intervals is not supported; "
+                "bootstrap confidence intervals are used.",
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("normal", None):
             warnings.warn(
                 "The argument 'normal' for normal theory tests is not supported. "
                 "Bootstrapped CI are recommended.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("varorder", None):
             warnings.warn(
                 "The argument 'varorder' for normal theory tests is not supported. "
                 "Bootstrapped CI are recommended.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("varlist", None):
             warnings.warn(
                 "The 'varlist' is not required. To specify controls, use the 'controls' arguments",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("coeffci", None):
             warnings.warn(
-                "The argument 'coeffci' is not supported.", DeprecationWarning
+                "The argument 'coeffci' is not supported.",
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("plot", None):
             warnings.warn(
                 "The argument 'plot' is not supported. Check the 'plot_conditional_direct_effects() and"
                 "'plot_conditional_indirect_effects()' methods instead.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
         if kwargs.pop("save", None):
             warnings.warn(
                 "The argument 'save' is not supported. Call the 'get_bootstrap_estimates() method to recover"
                 "the bootstrap samples instead.",
-                DeprecationWarning,
+                UserWarning,
+                stacklevel=2,
             )
-        if kwargs.pop("effsize", None):
+        if effsize:
             warnings.warn(
-                "The argument 'effsize' for effect sizes is not supported yet."
-                "It is coming in future versions of PyProcessMacro.",
-                SyntaxWarning,
+                "The argument 'effsize' for effect sizes is not supported and is ignored.",
+                UserWarning,
+                stacklevel=2,
             )
-        if kwargs.pop("jn", None):
+        if jn:
             warnings.warn(
-                "The argument 'jn' for the Johnson-Neyman region of significance is not supported."
-                "Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
-                DeprecationWarning,
+                "The argument 'jn' for the Johnson-Neyman region of significance is not supported and is "
+                "ignored. Call the 'floodlight_direct_effect()' and 'floodlight_indirect_effect()' methods instead.",
+                UserWarning,
+                stacklevel=2,
             )
 
         if model == 6:
@@ -720,6 +729,12 @@ class Process(object):
 
         # Check the congruence between the model specifications, the model number, and the data, and store the final
         # list of variables used
+        unknown_kwargs = set(kwargs) - self.__var_kws__
+        if unknown_kwargs:
+            raise TypeError(
+                f"Process() got unexpected keyword argument(s): {', '.join(sorted(unknown_kwargs))}. "
+                "Variables are x, y, m, w, z, v and q; check the spelling of the options."
+            )
         var_kwargs = {k: v for k, v in kwargs.items() if k in self.__var_kws__}
 
         # _gen_valid_varlist normalizes every variable argument to a list, so the mediator and
@@ -763,7 +778,8 @@ class Process(object):
         self.outcome_models = self._gen_outcome_models()
 
         # Rename the dictionary of custom spotlight values, and generating the spotlight values.
-        modval_symb = {self._var_to_symb.get(k): v for k, v in modval.items()}
+        self._check_moderator_names(modval, "modval")
+        modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         self._spotlight_values = self._gen_spotlight_values(modval_symb)
 
         # Generate the direct model.
@@ -779,6 +795,20 @@ class Process(object):
         if not suppr_init:
             self._print_init()
 
+    def _check_moderator_names(self, names, argument):
+        """
+        Raise a ValueError if any of the names is not a moderator of the model (#46).
+        :param names: iterable of variable names
+        :param argument: the name of the argument being validated, for the error message
+        """
+        moderators = {self._symb_to_var[s] for s in self._moderators["all"]}
+        unknown = [str(n) for n in names if n not in moderators]
+        if unknown:
+            raise ValueError(
+                f"The variable(s) {', '.join(unknown)} in '{argument}' are not moderators of Model "
+                f"{self.model_num}. Moderators of this model: {', '.join(sorted(moderators)) or 'none'}."
+            )
+
     def _gen_valid_options(self, arguments):
         """
         Validate the arguments specified for the different options used in Process.
@@ -793,8 +823,8 @@ class Process(object):
                 "The option 'conf' must be an integer between 50 and 100, exclusive.\n"
             )
 
-        if not isinstance(seed, int) or ((seed <= 0) or (seed >= 1e9)):
-            errstr += "The option 'seed' must be  an integer between 0 and 1 000 000 000, exclusive.\n"
+        if seed is not None and (not isinstance(seed, (int, np.integer)) or not (0 <= seed <= 2**32 - 1)):
+            errstr += "The option 'seed' must be None or an integer between 0 and 2**32 - 1.\n"
 
         if options["contrast"] not in [True, False]:
             errstr += "The option 'contrast' must be 'True' or 'False'.\n"
@@ -996,9 +1026,9 @@ class Process(object):
         """
         # Subset the data to the columns used in the model
         data = self._data[self.varlist].copy()
-        n_obs_before = self._data.shape[0]
-        data = data.dropna().reset_index()
-        n_obs_after = self._data.shape[0]
+        n_obs_before = data.shape[0]
+        data = data.dropna().reset_index(drop=True)
+        n_obs_after = data.shape[0]  # rows that survived dropna (#44)
         n_obs_null = n_obs_before - n_obs_after
 
         # Map each variable name to a unique variable code, and rename the columns in the data.)
@@ -1276,6 +1306,7 @@ class Process(object):
         :param path:
         :return:
         """
+        self._check_moderator_names(modval, "modval")
         modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         spotlight_values_symb = self._spotlight_values.copy()
 
@@ -1357,9 +1388,10 @@ class Process(object):
             m_var = self._symb_to_var[m]
             if modval_parsed.get(m_var) is None:
                 warnings.warn(
-                    f"The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on\
-                     the graph. Its value has been explicitely set to 0.",
-                    SyntaxWarning,
+                    f"The moderator {m_var} exerts an influence on the effect but is not a factor of the graph; "
+                    "its value has been set to 0.",
+                    UserWarning,
+                    stacklevel=3,
                 )
                 modval_parsed[m_var] = [0]
         return modval_parsed

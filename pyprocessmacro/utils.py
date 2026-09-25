@@ -33,8 +33,10 @@ def bias_corrected_ci(estimate, samples, conf=95):
     :param conf: Level of the desired confidence interval
     :return: Bias-corrected bootstrapped LLCI and ULCI for the estimate.
     """
-    # noinspection PyUnresolvedReferences
     ptilde = ((samples < estimate) * 1).mean()
+    # Every draw on one side of the estimate would make the bias correction infinite; clip to the
+    # resolution of the bootstrap distribution instead (#49).
+    ptilde = min(max(ptilde, 1 / len(samples)), 1 - 1 / len(samples))
     Z = norm.ppf(ptilde)
     Zci = z_score(conf)
     Zlow, Zhigh = -Zci + 2 * Z, Zci + 2 * Z
@@ -56,15 +58,16 @@ def percentile_ci(samples, conf):
     return np.percentile(samples, [lower, upper])
 
 
+class ConvergenceError(RuntimeError):
+    """Raised when the Newton-Raphson estimation of a logistic model does not converge."""
+
+
 def fast_OLS(endog, exog):
     """
     A simple function for (X'X)^(-1)X'Y
     :return: The Kx1 array of estimated coefficients.
     """
-    try:
-        return dot(dot(inv(dot(exog.T, exog)), exog.T), endog).squeeze()
-    except LinAlgError:
-        raise LinAlgError
+    return dot(dot(inv(dot(exog.T, exog)), exog.T), endog).squeeze()
 
 
 def logit_cdf(X):
@@ -118,17 +121,22 @@ def fast_optimize(endog, exog, n_obs=0, n_vars=0, max_iter=10000, tolerance=1e-1
     """
     iterations = 0
     oldparams = np.inf
-    newparams = np.repeat(0, n_vars)
+    newparams = np.zeros(n_vars)
     while iterations < max_iter and np.any(np.abs(newparams - oldparams) > tolerance):
         oldparams = newparams
         try:
             H = logit_hessian(exog, oldparams, n_obs)
-            newparams = oldparams - dot(
-                inv(H), logit_score(endog, exog, oldparams, n_obs)
-            )
+            newparams = oldparams - dot(inv(H), logit_score(endog, exog, oldparams, n_obs))
         except LinAlgError:
-            raise LinAlgError
+            raise ConvergenceError("The Hessian of the logistic regression is singular.")
         iterations += 1
+        if not np.all(np.isfinite(newparams)):
+            raise ConvergenceError("The logistic regression diverged (the outcome may be perfectly separated).")
+    if np.any(np.abs(newparams - oldparams) > tolerance):
+        raise ConvergenceError(
+            f"The logistic regression did not converge in {max_iter} iterations "
+            "(increase 'iterate', relax 'convergence', or check the outcome for separation)."
+        )
     return newparams
 
 
@@ -139,8 +147,7 @@ def bootstrap_sampler(n_obs, seed=None):
     :param seed: The seed to use for the random number generator
     :return: Bootstrapped indices of size n_obs
     """
-    seeder = np.random.RandomState(seed)
-    seeder.seed(seed)
+    seeder = np.random.RandomState(seed)  # None draws fresh entropy (#45)
     while True:
         yield seeder.randint(n_obs, size=n_obs)
 

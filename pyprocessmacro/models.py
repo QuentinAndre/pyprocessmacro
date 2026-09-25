@@ -19,6 +19,7 @@ from .utils import (
     t_score,
     percentile_ci,
     find_significance_region,
+    ConvergenceError,
 )
 
 
@@ -104,14 +105,26 @@ class BaseLogit(object):
             return -self._hessian(params) / self._n_obs
 
         oldparams = np.inf
-        newparams = np.repeat(0, self._n_vars)
+        newparams = np.zeros(self._n_vars)
         while iterations < max_iter and np.any(
                 np.abs(newparams - oldparams) > tolerance
         ):
             oldparams = newparams
-            H = hess(oldparams)
-            newparams = oldparams - dot(inv(H), score(oldparams))
+            try:
+                H = hess(oldparams)
+                newparams = oldparams - dot(inv(H), score(oldparams))
+            except LinAlgError:
+                raise ConvergenceError("The Hessian of the logistic regression is singular.")
             iterations += 1
+            if not np.all(np.isfinite(newparams)):
+                raise ConvergenceError(
+                    "The logistic regression diverged (the outcome may be perfectly separated)."
+                )
+        if np.any(np.abs(newparams - oldparams) > tolerance):
+            raise ConvergenceError(
+                f"The logistic regression did not converge in {max_iter} iterations "
+                "(increase 'iterate', relax 'convergence', or check the outcome for separation)."
+            )
         return newparams
 
 
@@ -651,6 +664,7 @@ class ParallelMediationModel(object):
         boot_betas_y = np.empty((n_boots, len(self._exog_terms_y)))
         boot_betas_m = np.empty((self._n_meds, n_boots, len(self._exog_terms_m)))
         n_fail_samples = 0
+        max_failures = n_boots  # give up once more resamples failed than were requested (#49)
         boot_ind = 0
         sampler = bootstrap_sampler(self._n_obs, seed)
         while boot_ind < n_boots:
@@ -667,8 +681,14 @@ class ParallelMediationModel(object):
                     m_b = self._compute_betas_m(m_e, m_x)
                     boot_betas_m[j][boot_ind] = m_b
                 boot_ind += 1
-            except LinAlgError:  # Hessian (Logit) or X'X (OLS) cannot be inverted
+            except (LinAlgError, ConvergenceError):  # X'X or the Hessian is singular, or the logit diverged
                 n_fail_samples += 1
+                if n_fail_samples > max_failures:
+                    raise RuntimeError(
+                        f"{n_fail_samples} bootstrap samples failed to estimate before {n_boots} succeeded. "
+                        "The model is probably not estimable on resamples of this data (check for separation, "
+                        "collinearity, or a very small sample)."
+                    )
 
         return boot_betas_y, boot_betas_m, n_fail_samples
 
