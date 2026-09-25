@@ -16,8 +16,6 @@ from .models import (
 )
 from .utils import plot_conditional_effects, gen_moderators
 
-warnings.simplefilter("default")
-
 
 class Process(object):
     __var_kws__ = {"x", "m", "w", "z", "v", "q", "y"}
@@ -1390,9 +1388,10 @@ class Process(object):
             m_var = self._symb_to_var[m]
             if modval_parsed.get(m_var) is None:
                 warnings.warn(
-                    f"The moderator {m_var} exerts an influence on the effect, but is not specified as a factor on\
-                     the graph. Its value has been explicitely set to 0.",
-                    SyntaxWarning,
+                    f"The moderator {m_var} exerts an influence on the effect but is not a factor of the graph; "
+                    "its value has been set to 0.",
+                    UserWarning,
+                    stacklevel=3,
                 )
                 modval_parsed[m_var] = [0]
         return modval_parsed

@@ -295,3 +295,20 @@ def test_unsupported_options_warn(fit, option):
 def test_unknown_keyword_arguments_raise(fit):
     with pytest.raises(TypeError, match="boots"):
         fit(4, boots=10, **SPEC[4])
+
+
+# --- #48: importing the package leaves the warning filters alone -------------------------------
+
+
+def test_import_does_not_change_warning_filters():
+    import subprocess
+    import sys
+
+    # The dependencies register filters of their own, so import them first and check that
+    # importing the package on top of them changes nothing.
+    code = (
+        "import warnings, numpy, scipy.stats, scipy.special, pandas, matplotlib.pyplot, seaborn; "
+        "before = list(warnings.filters); import pyprocessmacro; "
+        "assert warnings.filters == before, (before, warnings.filters)"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
