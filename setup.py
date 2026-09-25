@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
-import pyprocessmacro
 
 setup(
 
     name='PyProcessMacro',
 
-    version=pyprocessmacro.__version__,
+    version="1.0.13",
 
     packages=find_packages(),
 
@@ -33,9 +32,9 @@ setup(
         "Natural Language :: English",
         "Development Status :: 4 - Beta",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.7"
+        "Programming Language :: Python :: 3.14"
     ],
 
     license="MIT",
-    python_requires='>=3.7'
+    python_requires='>=3.14'
 )
