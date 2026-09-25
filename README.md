@@ -1,6 +1,8 @@
 ﻿PyProcessMacro: A Python Implementation of Andrew F. Hayes' 'Process' Macro
 ============================================================================
 
+[![CI](https://github.com/QuentinAndre/pyprocessmacro/actions/workflows/ci.yml/badge.svg)](https://github.com/QuentinAndre/pyprocessmacro/actions/workflows/ci.yml)
+
 # Copyright Notice for the original Process Macro
 
 The Process Macro for SAS and SPSS, and its associated files, are copyrighted by Andrew F. Hayes. The original code
