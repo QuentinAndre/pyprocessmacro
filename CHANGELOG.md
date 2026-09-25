@@ -18,6 +18,7 @@ Some reported values change in this release; see the migration notes in
 ### Fixed
 
 - Adjusted R² of the OLS outcome models used one degree of freedom too many; the F p-value is computed with the survival function so it no longer rounds to exactly zero (#41).
+- Cox-Snell and Nagelkerke pseudo R² of logistic outcome models are computed in log space and no longer become NaN beyond about a thousand observations (#42).
 
 ### Removed
 

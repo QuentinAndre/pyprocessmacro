@@ -69,3 +69,35 @@ def test_ols_model_summary_matches_statsmodels(fit, data):
     assert r["F_pval"] == pytest.approx(ref.f_pvalue, rel=1e-6)
     assert r["F_pval"] > 0
     assert (r["df_r"], r["df_e"]) == (ref.df_model, ref.df_resid)
+
+
+# --- #42: logit fit statistics -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("n", [300, 3000])
+def test_logit_fit_statistics_match_statsmodels(fit, n):
+    rng = np.random.default_rng(42)
+    x = rng.normal(size=n)
+    m = 0.5 * x + rng.normal(size=n)
+    y = (rng.random(n) < 1 / (1 + np.exp(-(0.8 * m + 0.5 * x)))).astype(int)
+    df = pd.DataFrame(dict(effort=x, med1=m, binary=y))
+    p = fit(4, df=df, x="effort", m=["med1"], y="binary", logit=True, boot=50)
+    model = p.outcome_models["binary"]
+    r = model.estimation_results
+    ref = sm.Logit(df["binary"], design(df, ["effort", "med1"])).fit(disp=0)
+    llf, llnull = ref.llf, ref.llnull
+    assert r["minus2ll"] == pytest.approx(-2 * llf, rel=1e-6)
+    assert r["d"] == pytest.approx(2 * (llf - llnull), rel=1e-6)
+    assert r["pvalue"] == pytest.approx(ref.llr_pvalue, rel=1e-4, abs=1e-12)
+    assert r["mcfadden"] == pytest.approx(ref.prsquared, rel=1e-6)
+    coxsnell = 1 - np.exp(2 * (llnull - llf) / n)
+    assert r["coxsnell"] == pytest.approx(coxsnell, rel=1e-6)
+    assert r["nagelkerke"] == pytest.approx(coxsnell / (1 - np.exp(2 * llnull / n)), rel=1e-6)
+    assert np.isfinite([r["coxsnell"], r["nagelkerke"]]).all()
+    coeffs = model.coeff_summary()
+    ci = ref.conf_int(alpha=0.05)
+    for name, ref_name in [("Cons", "const"), ("effort", "effort"), ("med1", "med1")]:
+        assert coeffs.loc[name, "coeff"] == pytest.approx(ref.params[ref_name], rel=1e-5)
+        assert coeffs.loc[name, "se"] == pytest.approx(ref.bse[ref_name], rel=1e-4)
+        assert coeffs.loc[name, "LLCI"] == pytest.approx(ci.loc[ref_name, 0], rel=1e-4)
+        assert coeffs.loc[name, "ULCI"] == pytest.approx(ci.loc[ref_name, 1], rel=1e-4)

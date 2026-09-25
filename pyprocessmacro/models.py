@@ -419,19 +419,19 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
 
         # GOF statistics
         llmodel = self._loglike(betas)
-        lmodel = np.exp(llmodel)
         minus2ll = -2 * llmodel
 
         null_model = NullLogitModel(self._endog, self._options)
         betas_null = null_model._optimize()
         llnull = null_model._loglike(betas_null)
-        lnull = np.exp(llnull)
 
         d = 2 * (llmodel - llnull)
         pvalue = stats.chi2.sf(d, self._n_vars - 1)
         mcfadden = 1 - llmodel / llnull
-        coxsnell = 1 - (lnull / lmodel) ** (2 / self._n_obs)
-        nagelkerke = coxsnell / (1 - lnull ** (2 / self._n_obs))
+        # Likelihood ratios are taken in log space: exp(llnull) underflows to 0 beyond about a
+        # thousand observations, which turned both pseudo R-squared into NaN (#42).
+        coxsnell = 1 - np.exp(2 * (llnull - llmodel) / self._n_obs)
+        nagelkerke = coxsnell / (1 - np.exp(2 * llnull / self._n_obs))
         names = [self._symb_to_var.get(x, x) for x in self._exogvars]
         estimation_results = {
             "betas": betas,
