@@ -28,8 +28,9 @@ softwaress. PyProcessMacro is released under a MIT license.
 # Features
 
 In the current version, PyProcessMacro replicates the following features from the original Process Macro v2.16:
-  * All models (1 to 76), with the exception of Model 6 (serial mediation) are supported, and have been numerically
-  tested for accuracy against the output of the original Process macro (see the `test_models_accuracy.py`)
+  * All models (1 to 76) are supported. Models 1 to 5 and 7 to 76 are tested for accuracy against the output of the
+  original Process macro (see `tests/test_models_accuracy.py`); Model 6 (serial mediation, added in 2.1) is tested
+  against statsmodels-based reference computations.
   * Estimation of binary/continuous outcome variables. The binary outcomes are estimated in Logit using the 
   Newton-Raphson convergence algorithm, the continuous variables are estimated using OLS.
   * All statistics reported by Process: 
@@ -58,7 +59,6 @@ In the current version, the following features have not yet been ported to PyPro
   * Support for categorical independent variables.
   * Generation of individual fixed effects for repeated measures.
   * R² improvement from moderators in moderation models (1, 2, 3).
-  * Estimation of serial mediation (Model 6)
   * Some options (`normal`, `varorder`, ...). PyProcessMacro will issue a warning to tell you if an option you are 
   trying to use is not implemented.
 
@@ -286,6 +286,24 @@ By default, the standard errors of the OLS outcome models use the standard (homo
 ````python
 p = Process(data=df, model=4, x="Effort", y="Success", m=["MediationSkills"], cov_type="HC3")
 ````
+
+### G. Serial mediation (Model 6)
+
+In Model 6 the mediators form a chain: each mediator depends on X and on the mediators before it, and Y depends
+on X and on every mediator. Pass two to four mediators in causal order. PyProcessMacro reports the specific
+indirect effect through every ordered subset of mediators (three paths for two mediators, seven for three,
+fifteen for four), labelled by the path, plus the total and the pairwise contrasts when `total=True` and
+`contrast=True`.
+
+````python
+p = Process(data=df, model=6, x="Effort", y="Success", m=["Attention", "MediationSkills"], total=True)
+p.summary()
+````
+
+Model 6 has no moderators, so the spotlight, floodlight and plotting methods do not apply to it. Its estimates are
+checked against products of statsmodels coefficients and against an independent resampler; no PROCESS output for
+Model 6 is part of the test fixtures yet, so a comparison file generated with PROCESS 2.16 would be a welcome
+contribution.
 
 ## 2. Accessing the estimation results
 

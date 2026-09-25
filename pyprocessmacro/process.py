@@ -6,6 +6,7 @@ from itertools import product
 import numpy as np
 import pandas as pd
 
+from .serial import SerialMediationModel
 from .models import (
     OLSOutcomeModel,
     DirectEffectModel,
@@ -710,12 +711,6 @@ class Process(object):
                 stacklevel=2,
             )
 
-        if model == 6:
-            raise NotImplementedError(
-                "The model 6 for serial mediation is not supported yet."
-                "It is coming in future versions of PyProcessMacro."
-            )
-
         if not isinstance(data, pd.DataFrame):
             raise ValueError(
                 "The variable provided for data is not a valid pd.DataFrame object. Please provide a"
@@ -759,6 +754,10 @@ class Process(object):
         else:
             self.n_meds = 0  # 1, 2 and 3 are moderation-only
             self.has_mediation = False
+        if self.model_num == 6 and not (
+                SerialMediationModel.MIN_MEDIATORS <= self.n_meds <= SerialMediationModel.MAX_MEDIATORS
+        ):
+            raise ValueError("Model 6 (serial mediation) takes two to four mediators, in causal order, as in PROCESS.")
 
         # Creating the dictionary mapping each variable to its symbol (y, x, m, w, ...)
         self._var_to_symb, self._symb_to_var = self._gen_var_mapping(var_kwargs)
@@ -1013,23 +1012,12 @@ class Process(object):
             ]  # Same equation for all mediators
             return eqlist
 
-        else:  # Serial mediators are only found in model 6
-            eq_y_full = ["Cons"] + [i for i in all_to_y if "m" not in i]
-            eq_x_to_meds_basis = ["Cons"] + [i for i in x_to_m]
-
-            # Substitute the individual mediation terms to the general term "m" in the equations
+        else:  # Model 6: serial mediators, each depending on X and on the mediators before it (#69)
+            eq_y = ["Cons"] + [t for t in all_to_y_base if "m" not in t] + [f"m{i + 1}" for i in range(self.n_meds)]
+            eqlist.append(("y", eq_y))
             for i in range(self.n_meds):
-                for term in all_to_y:
-                    if "m" in term:
-                        eq_y_full.append(term.replace("m", f"m{i + 1}"))
-                    else:
-                        pass
-
-            eqlist.append(("y", eq_y_full))  # Equation for Y
-            for i in range(self.n_meds):  # One equation per mediator
-                # Add the previous mediators as predictors
-                eq_x_to_med = eq_x_to_meds_basis + [f"m{i + 1}" for _ in range(i)]
-                eqlist.append((f"m{i + 1}", eq_x_to_med))
+                previous = [f"m{j + 1}" for j in range(i)]
+                eqlist.append((f"m{i + 1}", ["Cons"] + [t for t in x_to_m_base if "m" not in t] + previous))
         return eqlist
 
     def _prepare_data(self):
@@ -1196,9 +1184,13 @@ class Process(object):
         Generate the Parallel Mediation Model for the indirect path.
         :return: a ParallelMediationModel object, properly initialized.
         """
+        data_array = self._data.values
+        if self.model_num == 6:
+            return SerialMediationModel(
+                data_array, self._equations, self.n_meds, self._symb_to_ind, self._symb_to_var, self.options
+            )
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
-        data_array = self._data.values
         mod_symb = self._moderators["indirect"]
         spot_values = self._spotlight_values
         analysis_list = self._gen_analysis_list()
@@ -1501,9 +1493,10 @@ class Process(object):
         df_y = pd.DataFrame(boot_betas_y, columns=[stv[t] for t in iem._exog_terms_y])
         df_y.insert(0, "OutcomeName", stv["y"])
         frames.append(df_y)
-        cols_m = [stv[t] for t in iem._exog_terms_m]
+        # Parallel mediators share one design; serial mediators (model 6) each have their own.
+        terms_m = getattr(iem, "_exog_terms_m_list", None) or [iem._exog_terms_m] * self.n_meds
         for i in range(self.n_meds):
-            df_m = pd.DataFrame(boot_betas_m[i], columns=cols_m)
+            df_m = pd.DataFrame(boot_betas_m[i], columns=[stv[t] for t in terms_m[i]])
             df_m.insert(0, "OutcomeName", stv[f"m{i + 1}"])
             frames.append(df_m)
         # One block per outcome. DataFrame.append was removed in pandas 2.0 (#33).

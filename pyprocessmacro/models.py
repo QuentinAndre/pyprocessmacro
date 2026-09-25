@@ -1404,6 +1404,18 @@ class ParallelMediationModel(object):
                 "This model does not report the Conditional Moderated Mediation index."
             )
 
+    @property
+    def effect_labels(self):
+        """(component, term) for every row of unmoderated estimation_results, in order."""
+        mediators = [self._symb_to_var.get(f"m{i + 1}", f"m{i + 1}") for i in range(self._n_meds)]
+        labels = []
+        if self._options["total"]:
+            labels.append(("total", "total"))
+        labels += [("indirect", med) for med in mediators]
+        if self._options["contrast"]:
+            labels += [("contrast", f"{a} vs. {b}") for a, b in combinations(mediators, 2)]
+        return labels
+
     def coeff_summary(self):
         """
         Get the summary of the indirect effect(s).
