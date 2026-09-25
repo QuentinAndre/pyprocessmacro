@@ -22,12 +22,14 @@ Work towards 1.0.14, a hotfix release. Tracked in the
 ### Fixed
 
 - The wheel no longer installs a top-level `tests` package (#29).
+- `Process.summary()` and the four index summaries no longer fail on pandas 3, where `to_numeric(errors="ignore")` was removed (#32).
 
 ### Added
 
 - Continuous integration on GitHub Actions across Python 3.11 to 3.14 and
   pandas 2 and 3, plus a build-and-check job (#31).
 - This changelog (#30).
+- Smoke tests of the public API in `tests/test_api_smoke.py`, marked `smoke`.
 
 ## [1.0.13] - 2026-03-31
 
