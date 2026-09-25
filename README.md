@@ -305,6 +305,19 @@ checked against products of statsmodels coefficients and against an independent 
 Model 6 is part of the test fixtures yet, so a comparison file generated with PROCESS 2.16 would be a welcome
 contribution.
 
+### H. Effect sizes for the indirect effect
+
+With `effsize=True`, PyProcessMacro also reports the partially standardized indirect effect (the indirect effect
+divided by the standard deviation of Y) and the completely standardized indirect effect (further multiplied by the
+standard deviation of X), each with a bootstrap confidence interval computed by standardizing within every resample,
+as PROCESS does. The option applies to unmoderated indirect paths with a continuous outcome, that is Models 4 and 6
+with `logit=False`.
+
+````python
+p = Process(data=df, model=4, x="Effort", y="Success", m=["MediationSkills"], effsize=True)
+p.indirect_model.effect_size_summary()
+````
+
 ## 2. Accessing the estimation results
 
 After the `Process` object is initialized, you are not limited to printing the summary. PyProcessMacro implements the

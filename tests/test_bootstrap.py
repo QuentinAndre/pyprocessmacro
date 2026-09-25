@@ -46,7 +46,7 @@ def test_vectorized_bootstrap_matches_the_sequential_loop(fit, kwargs):
     np.testing.assert_allclose(model._boot_betas_m, ref_m, rtol=1e-7, atol=1e-10)
     assert model._n_fail_samples == ref_fail == 0
     # Chunking does not change the result either.
-    small_y, small_m, _ = bs.bootstrap_parameters(model._data, spec, 300, 11, chunk_size=7)
+    small_y, small_m, _, _ = bs.bootstrap_parameters(model._data, spec, 300, 11, chunk_size=7)
     np.testing.assert_allclose(small_y, model._boot_betas_y, rtol=1e-10)
     np.testing.assert_allclose(small_m, model._boot_betas_m, rtol=1e-10)
 
