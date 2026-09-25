@@ -608,7 +608,9 @@ class Process(object):
         :param conf: int
             A value between 51 and 99, representing the desired level of confidence for the confidence intervals
         :param effsize: bool
-            If True, an estimate of the effect size will be reported.
+            If True, the partially and completely standardized indirect effects are reported, with bootstrap
+            confidence intervals. Available for unmoderated indirect paths with a continuous outcome (models 4
+            and 6 with logit=False).
         :param jn: bool
             If True, the Johnson-Neymann region of significance will be reported.
         :param hc3: bool
@@ -697,12 +699,6 @@ class Process(object):
                 UserWarning,
                 stacklevel=2,
             )
-        if effsize:
-            warnings.warn(
-                "The argument 'effsize' for effect sizes is not supported and is ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
         if jn:
             warnings.warn(
                 "The argument 'jn' for the Johnson-Neyman region of significance is not supported and is "
@@ -767,6 +763,16 @@ class Process(object):
         raw_varlist = copy.deepcopy(self.__models_vars__[model])
 
         self._moderators = gen_moderators(raw_equations, raw_varlist)
+
+        if self.options["effsize"]:
+            if not self.has_mediation:
+                raise ValueError("The option 'effsize' standardizes indirect effects; Model "
+                                 f"{self.model_num} has no mediator.")
+            if self.options["logit"]:
+                raise ValueError("The option 'effsize' requires a continuous outcome (logit=False).")
+            if self._moderators["indirect"]:
+                raise ValueError("The option 'effsize' is available for unmoderated indirect paths only "
+                                 "(models 4 and 6).")
 
         # Generating the equations used for estimation: a list of (exog, endog) tuples.
         self._equations = self._gen_equations(
@@ -837,6 +843,8 @@ class Process(object):
             errstr += "The option 'contrast' must be 'True' or 'False'.\n"
         if options["total"] not in [True, False]:
             errstr += "The option 'total' must be 'True' or 'False'.\n"
+        if options["effsize"] not in [True, False]:
+            errstr += "The option 'effsize' must be 'True' or 'False'.\n"
         if options["jn"] not in [True, False]:
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["hc3"] not in [True, False]:
@@ -1472,6 +1480,9 @@ class Process(object):
             for code in self.indirect_model._analysis_list:
                 html.append(f"<h4>Index of {self.indirect_model.ANALYSIS_NAMES[code].lower()}</h4>")
                 html.append(getattr(self.indirect_model, f"{code}_index_summary")().to_html(float_format=fmt))
+            if self.options.get("effsize"):
+                html.append("<h4>Standardized indirect effect(s)</h4>")
+                html.append(self.indirect_model.effect_size_summary().to_html(float_format=fmt))
         else:
             html.append("<h4>Conditional effect(s)</h4>")
             html.append(self.direct_model.coeff_summary().to_html(float_format=fmt))

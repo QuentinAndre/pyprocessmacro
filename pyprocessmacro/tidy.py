@@ -45,7 +45,7 @@ def tidy(process, component=None):
     :param process: a fitted Process instance
     :param component: None for every row, or one component name or a list of names to keep, among
         "outcome", "direct", "indirect", "total", "contrast", "index_mm", "index_pmm", "index_mmm",
-        "index_cmm".
+        "index_cmm", "indirect_ps", "indirect_cs".
     :return: DataFrame with the columns component, outcome, term, moderator, one column per moderator
         of the model holding the spotlight value the row is evaluated at, estimate, std_error,
         statistic, p_value, conf_low, conf_high, method, conf_level, n_boot.
@@ -110,6 +110,14 @@ def tidy(process, component=None):
             add(comp, dv, term, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
                 boot_method, boot=True)
 
+    if process.options.get("effsize"):
+        sizes = indirect.effect_sizes()
+        for kind, comp in (("ps", "indirect_ps"), ("cs", "indirect_cs")):
+            rows_k = sizes[kind]
+            for k, term in enumerate(rows_k["labels"]):
+                add(comp, dv, term, rows_k["effect"][k], rows_k["se"][k], rows_k["llci"][k], rows_k["ulci"][k],
+                    boot_method, boot=True)
+
     # Indices of moderated mediation, in the layouts of the corresponding index methods.
     mod_symbols = list(indirect._moderators_symb)
     mod_names = [stv[s] for s in mod_symbols]
@@ -154,7 +162,8 @@ def _finish(rows, columns, component):
     if component is not None:
         wanted = [component] if isinstance(component, str) else list(component)
         unknown = sorted(set(wanted) - set(frame["component"].unique()) - {
-            "outcome", "direct", "indirect", "total", "contrast", "index_mm", "index_pmm", "index_mmm", "index_cmm"
+            "outcome", "direct", "indirect", "total", "contrast", "index_mm", "index_pmm", "index_mmm", "index_cmm",
+            "indirect_ps", "indirect_cs",
         })
         if unknown:
             raise ValueError(f"Unknown component(s): {', '.join(unknown)}.")

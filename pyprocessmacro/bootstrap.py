@@ -29,7 +29,7 @@ class BootstrapSpec:
         self.tolerance = tolerance
 
 
-def bootstrap_parameters(data, spec, n_boots, seed, chunk_size=None):
+def bootstrap_parameters(data, spec, n_boots, seed, chunk_size=None, sd_inds=None):
     """
     Estimate the outcome and mediator equations on n_boots resamples of the data.
 
@@ -38,8 +38,10 @@ def bootstrap_parameters(data, spec, n_boots, seed, chunk_size=None):
     :param n_boots: number of successful resamples wanted
     :param seed: seed of the resampler (None for fresh entropy)
     :param chunk_size: resamples fitted per batch; None picks one from the data size
-    :return: (betas_y, betas_m, n_fail): (n_boots x k_y) array, (n_meds x n_boots x k_m) array, and the
-        number of resamples discarded because an equation could not be estimated on them.
+    :param sd_inds: columns whose standard deviation is wanted for every successful resample (#70)
+    :return: (betas_y, betas_m, n_fail, sds): (n_boots x k_y) array, (n_meds x n_boots x k_m) array, the
+        number of resamples discarded because an equation could not be estimated on them, and the
+        (n_boots x len(sd_inds)) array of standard deviations, or None.
     """
     data = np.asarray(data, dtype=float)
     n_obs, n_cols = data.shape
@@ -49,24 +51,24 @@ def bootstrap_parameters(data, spec, n_boots, seed, chunk_size=None):
     k_y, k_m, n_meds = len(spec.exog_inds_y), len(spec.exog_inds_m), len(spec.inds_m)
     betas_y = np.empty((n_boots, k_y))
     betas_m = np.empty((n_meds, n_boots, k_m))
+    sds = None if sd_inds is None else np.empty((n_boots, len(sd_inds)))
     filled, n_fail, max_failures = 0, 0, n_boots
     while filled < n_boots:
         count = min(chunk_size, n_boots - filled)
         indices = np.stack([next(sampler) for _ in range(count)])  # one draw per sample: same stream as before
-        chunk_y, chunk_m, failed = _fit_chunk(data[indices], spec)
+        chunk = data[indices]
+        chunk_y, chunk_m, failed = _fit_chunk(chunk, spec)
         ok = ~failed
         n_ok = int(ok.sum())
         betas_y[filled:filled + n_ok] = chunk_y[ok]
         betas_m[:, filled:filled + n_ok] = chunk_m[:, ok]
+        if sd_inds is not None:
+            sds[filled:filled + n_ok] = chunk[ok][:, :, sd_inds].std(axis=1, ddof=1)
         filled += n_ok
         n_fail += int(failed.sum())
         if n_fail > max_failures:
-            raise RuntimeError(
-                f"{n_fail} bootstrap samples failed to estimate before {n_boots} succeeded. "
-                "The model is probably not estimable on resamples of this data (check for separation, "
-                "collinearity, or a very small sample)."
-            )
-    return betas_y, betas_m, n_fail
+            raise RuntimeError(FAILURE_MESSAGE.format(n_fail=n_fail, n_boots=n_boots))
+    return betas_y, betas_m, n_fail, sds
 
 
 def _fit_chunk(chunk, spec):
@@ -164,12 +166,14 @@ FAILURE_MESSAGE = (
 )
 
 
-def bootstrap_equations(data, equations, n_boots, seed, max_iter=10000, tolerance=1e-10, chunk_size=None):
+def bootstrap_equations(data, equations, n_boots, seed, max_iter=10000, tolerance=1e-10, chunk_size=None,
+                        sd_inds=None):
     """
     Estimate several equations, each with its own design matrix, on n_boots resamples (serial mediation).
 
     :param equations: list of (endog_ind, exog_inds, logit) triples
-    :return: (list of (n_boots x k_i) arrays, one per equation, n_fail)
+    :param sd_inds: columns whose standard deviation is wanted for every successful resample (#70)
+    :return: (list of (n_boots x k_i) arrays, one per equation, n_fail, sds or None)
     """
     data = np.asarray(data, dtype=float)
     n_obs, n_cols = data.shape
@@ -177,20 +181,24 @@ def bootstrap_equations(data, equations, n_boots, seed, max_iter=10000, toleranc
         chunk_size = int(max(1, min(n_boots, CHUNK_ELEMENTS // max(1, n_obs * n_cols))))
     sampler = bootstrap_sampler(n_obs, seed)
     betas = [np.empty((n_boots, len(exog_inds))) for _, exog_inds, _ in equations]
+    sds = None if sd_inds is None else np.empty((n_boots, len(sd_inds)))
     filled, n_fail, max_failures = 0, 0, n_boots
     while filled < n_boots:
         count = min(chunk_size, n_boots - filled)
         indices = np.stack([next(sampler) for _ in range(count)])
-        chunk_betas, failed = _fit_equations_chunk(data[indices], equations, max_iter, tolerance)
+        chunk = data[indices]
+        chunk_betas, failed = _fit_equations_chunk(chunk, equations, max_iter, tolerance)
         ok = ~failed
         n_ok = int(ok.sum())
         for store, estimates in zip(betas, chunk_betas):
             store[filled:filled + n_ok] = estimates[ok]
+        if sd_inds is not None:
+            sds[filled:filled + n_ok] = chunk[ok][:, :, sd_inds].std(axis=1, ddof=1)
         filled += n_ok
         n_fail += int(failed.sum())
         if n_fail > max_failures:
             raise RuntimeError(FAILURE_MESSAGE.format(n_fail=n_fail, n_boots=n_boots))
-    return betas, n_fail
+    return betas, n_fail, sds
 
 
 def _fit_equations_chunk(chunk, equations, max_iter, tolerance):

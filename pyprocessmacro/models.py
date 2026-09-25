@@ -710,8 +710,9 @@ class ParallelMediationModel(object):
             tolerance=self._options["convergence"],
         )
         # Batched estimation with the same draws as the sequential loop (#68).
-        boot_betas_y, boot_betas_m, n_fail_samples = bootstrap_parameters(
-            self._data, spec, self._options["boot"], self._options["seed"]
+        boot_betas_y, boot_betas_m, n_fail_samples, self._boot_sds = bootstrap_parameters(
+            self._data, spec, self._options["boot"], self._options["seed"],
+            sd_inds=[self._symb_to_ind["x"], self._ind_y],  # per-resample SDs for the standardized effects (#70)
         )
         return boot_betas_y, boot_betas_m, n_fail_samples
 
@@ -1404,6 +1405,30 @@ class ParallelMediationModel(object):
                 "This model does not report the Conditional Moderated Mediation index."
             )
 
+    def _raw_indirect_draws(self):
+        """Labels, estimates and bootstrap draws of the total (if requested) and of each mediator's indirect effect."""
+        e = np.empty(self._n_meds)
+        be = np.empty((self._n_meds, self._options["boot"]))
+        for i in range(self._n_meds):
+            e[i], be[i], *_ = self._indirect_effect_at(i, {})
+        labels = [term for component, term in self.effect_labels if component != "contrast"]
+        if self._options["total"]:
+            e = np.concatenate([[e.sum()], e])
+            be = np.concatenate([be.sum(axis=0, keepdims=True), be])
+        return labels, e, be
+
+    def effect_sizes(self):
+        """Partially and completely standardized indirect effects; see effsize.standardized_effects (#70)."""
+        from . import effsize as _effsize
+
+        return _effsize.standardized_effects(self)
+
+    def effect_size_summary(self):
+        """The standardized indirect effects as one table with a Standardization column (#70)."""
+        from . import effsize as _effsize
+
+        return _effsize.effect_size_table(self)
+
     @property
     def effect_labels(self):
         """(component, term) for every row of unmoderated estimation_results, in order."""
@@ -1465,6 +1490,10 @@ class ParallelMediationModel(object):
                     name=name, results=results.to_string(float_format=float_format)
                 )
             )
+        if self._options.get("effsize"):
+            from . import effsize as _effsize
+
+            basestr += _effsize.effect_size_text(self, float_format)
         return basestr
 
     def __str__(self):

@@ -286,7 +286,7 @@ def test_plot_modval_rejects_unknown_names(fit):
 # --- #47: unsupported options warn, unknown ones raise -----------------------------------------
 
 
-@pytest.mark.parametrize("option", ["jn", "effsize", "mc", "normal", "varorder", "coeffci", "plot", "save"])
+@pytest.mark.parametrize("option", ["jn", "mc", "normal", "varorder", "coeffci", "plot", "save"])
 def test_unsupported_options_warn(fit, option):
     with pytest.warns(UserWarning, match=option):
         fit(4, **{option: True}, **SPEC[4])

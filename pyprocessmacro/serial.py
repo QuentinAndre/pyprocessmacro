@@ -118,11 +118,34 @@ class SerialMediationModel(object):
         equations = [(self._ind_y, self._exog_inds_y, bool(self._options["logit"]))] + [
             (ind, exog_inds, False) for ind, exog_inds in zip(self._inds_m, self._exog_inds_m_list)
         ]
-        betas, n_fail = bootstrap_equations(
+        betas, n_fail, self._boot_sds = bootstrap_equations(
             self._data, equations, self._options["boot"], self._options["seed"],
             max_iter=self._options["iterate"], tolerance=self._options["convergence"],
+            sd_inds=[self._symb_to_ind["x"], self._ind_y],  # per-resample SDs for the standardized effects (#70)
         )
         return betas[0], betas[1:], n_fail
+
+    def _raw_indirect_draws(self):
+        """Labels, estimates and bootstrap draws of the total (if requested) and of every path."""
+        e = np.array([self._path_effect(p, self._true_betas_y, self._true_betas_m) for p in self._paths])
+        be = np.array([self._path_effect(p, self._boot_betas_y, self._boot_betas_m) for p in self._paths])
+        labels = [term for component, term in self.effect_labels if component != "contrast"]
+        if self._options["total"]:
+            e = np.concatenate([[e.sum()], e])
+            be = np.concatenate([be.sum(axis=0, keepdims=True), be])
+        return labels, e, be
+
+    def effect_sizes(self):
+        """Partially and completely standardized indirect effects; see effsize.standardized_effects (#70)."""
+        from . import effsize as _effsize
+
+        return _effsize.standardized_effects(self)
+
+    def effect_size_summary(self):
+        """The standardized indirect effects as one table with a Standardization column (#70)."""
+        from . import effsize as _effsize
+
+        return _effsize.effect_size_table(self)
 
     def _path_effect(self, path, betas_y, betas_m):
         """Product of the coefficients along a path; betas may be 1-D (estimates) or 2-D (bootstrap draws)."""
@@ -182,9 +205,14 @@ class SerialMediationModel(object):
         prec = self._options["precision"]
         float_format = partial("{:.{prec}f}".format, prec=prec)
         stv = self._symb_to_var
-        return "Indirect effect(s) of {x} on {y} through the serial mediators:\n\n{coeffs}\n\n".format(
+        text = "Indirect effect(s) of {x} on {y} through the serial mediators:\n\n{coeffs}\n\n".format(
             x=stv["x"], y=stv["y"], coeffs=self.coeff_summary().to_string(float_format=float_format)
         )
+        if self._options.get("effsize"):
+            from . import effsize as _effsize
+
+            text += _effsize.effect_size_text(self, float_format)
+        return text
 
     def __str__(self):
         return self.summary()
