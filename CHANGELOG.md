@@ -38,6 +38,7 @@ Some reported values change in this release; see the migration notes in
 - `statsmodels` is a test dependency (`pip install -e .[test]`).
 - The accuracy suite against PROCESS now also covers model 4, the conditional effects of the moderation-only models 1 to 3, and the index tables of every model where PROCESS 2.16 prints one.
 - `cov_type` option selecting the OLS covariance estimator: `"standard"` (default), `"HC0"`, `"HC1"`, `"HC2"` or `"HC3"`; `hc3=True` remains as shorthand for `"HC3"`. `Process.dv` names the outcome variable; `iv`, which held it under a misleading name, is kept for compatibility (#52).
+- README: an "Upgrading to 2.0" section listing every change in reported values and behaviour, and documentation of `cov_type`; the 1.0.4 note no longer calls the default estimator HC0 (#51).
 
 ## [1.0.14] - 2026-09-25
 

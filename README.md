@@ -35,7 +35,8 @@ In the current version, PyProcessMacro replicates the following features from th
   * All statistics reported by Process: 
     * Variable parameters for outcome models
     * (Conditional) direct and indirect effects
-    * Indices for Partial/Conditional/Moderated Moderated Mediation are always reported if the model supports them.
+    * The index of moderated mediation and, following PROCESS 3, the indices of partial, conditional and
+    moderated moderated mediation, whenever the indirect effect is linear in the moderator(s).
   * Automatic generation of spotlight values for continuous/discrete moderators.
   * Rich set of options to tweak the estimation and display of the different models: (almost) all the options from
   Process exist in PyProcessMacro. Check the doc for more details.
@@ -61,6 +62,38 @@ In the current version, the following features have not yet been ported to PyPro
   * Some options (`normal`, `varorder`, ...). PyProcessMacro will issue a warning to tell you if an option you are 
   trying to use is not implemented.
 
+# Upgrading to 2.0
+
+Version 2.0 corrects several statistics and tightens input handling. Reported numbers change in these ways:
+
+* Confidence intervals of OLS coefficients and of (conditional) direct effects use t critical values with the
+  residual degrees of freedom, as PROCESS does. They were based on z, so they widen slightly; the difference is
+  visible in small samples.
+* Adjusted R² of OLS outcome models is slightly higher: the previous value used one degree of freedom too many.
+* Cox-Snell and Nagelkerke pseudo R² of logistic outcome models are finite for large samples instead of NaN.
+* No index of moderated mediation is reported when a moderator sits on both the X-to-M and the M-to-Y paths
+  (models 58 to 73, 75 and 76), matching PROCESS: the indirect effect is not linear in such a moderator. The
+  `*_index_summary()` methods raise `NotImplementedError` for those models.
+* The sample size reported after listwise deletion is the number of rows kept.
+
+Behaviour that used to be silent now speaks up:
+
+* A misspelled key in `modval`, or a keyword argument that is neither a variable nor an option, raises an error
+  instead of being ignored.
+* Unsupported PROCESS options (`jn`, `effsize`, `mc`, `normal`, ...) raise a visible `UserWarning`.
+* A logistic regression that does not converge raises `pyprocessmacro.ConvergenceError`. Bootstrap resamples
+  that fail are counted, and the bootstrap stops with an error if more resamples fail than were requested.
+
+Removed and added:
+
+* `plot_direct_effects()` and `plot_indirect_effects()` are removed; use `plot_conditional_direct_effects()`
+  and `plot_conditional_indirect_effects()`.
+* `cov_type` selects the OLS covariance estimator (`"standard"`, `"HC0"`, `"HC1"`, `"HC2"` or `"HC3"`);
+  `hc3=True` remains as shorthand for `"HC3"`.
+* `seed=None` draws a different bootstrap sample on every run, and `seed=0` is accepted.
+* `Process.dv` names the outcome variable (`iv` is kept for compatibility).
+* Python 3.11 or newer is required (since 1.0.14).
+
 # Version History
 
 ## Master Versions
@@ -84,7 +117,7 @@ report and for the fix.
 
 ### 1.0.4
 **Bug fix for standard error estimate in all models**
-PyProcessMacro was, by default, using the HC3 estimator for the variance-covariance matrix instead of the HC0 estimator. 
+PyProcessMacro was, by default, using the HC3 estimator for the variance-covariance matrix instead of the standard (non-robust) estimator. 
 This has now been changed. To continue using the HC3 estimator, specify `hc3=True` when initializing the Process instance. 
 Thanks to Zoé Ziani for the bug report.
 
@@ -239,6 +272,17 @@ When the Process object is initialized by Python, it displays various informatio
 p = Process(data=df, model=13, x="Effort", y="Success", w="Motivation", z="SkillRelevance", 
             m=["MediationSkills", "ModerationSkills"], suppr_init=True)
 p.summary()
+````
+
+### F. Choosing the covariance estimator
+
+By default, the standard errors of the OLS outcome models use the standard (homoskedastic) estimator. The
+`cov_type` argument selects a heteroskedasticity-consistent estimator instead: `"HC0"`, `"HC1"`, `"HC2"` or
+`"HC3"`. `hc3=True` is shorthand for `cov_type="HC3"`, which is what the original Process macro uses when
+`hc3=1` is specified. Logistic outcome models always use the inverse of the Hessian.
+
+````python
+p = Process(data=df, model=4, x="Effort", y="Success", m=["MediationSkills"], cov_type="HC3")
 ````
 
 ## 2. Accessing the estimation results
