@@ -369,3 +369,11 @@ def test_deprecated_plot_methods_and_stubs_are_gone():
     assert not hasattr(Process, "plot_direct_effects")
     assert not hasattr(Process, "plot_indirect_effects")
     assert glob.glob(os.path.join(os.path.dirname(pyprocessmacro.__file__), "*.pyi")) == []
+
+
+# --- #52: dv alias ------------------------------------------------------------------------------
+
+
+def test_dv_names_the_outcome(fit):
+    p = fit(4, **SPEC[4])
+    assert p.dv == p.iv == "outcome"

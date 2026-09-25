@@ -29,6 +29,7 @@ class Process(object):
         "effsize",
         "jn",
         "hc3",
+        "cov_type",
         "controls_in",
         "total",
         "center",
@@ -562,6 +563,7 @@ class Process(object):
             effsize=False,
             jn=False,
             hc3=False,
+            cov_type="standard",
             controls=None,
             controls_in="all",
             total=False,
@@ -609,6 +611,11 @@ class Process(object):
             If True, the Johnson-Neymann region of significance will be reported.
         :param hc3: bool
             If True, the HC3 estimator will be used for the variance/covariance matrix of the parameters.
+            Shorthand for cov_type="HC3".
+        :param cov_type: "standard", "HC0", "HC1", "HC2" or "HC3"
+            The estimator of the variance/covariance matrix of the OLS parameters: the standard homoskedastic
+            estimator, or one of the heteroskedasticity-consistent estimators. Logistic outcome models always
+            use the inverse of the Hessian.
         :param controls: list of string
             A list of control variables to include to the model(s).
         :param controls_in: "all", "x_to_m", "all_to_y"
@@ -834,6 +841,12 @@ class Process(object):
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["hc3"] not in [True, False]:
             errstr += "The option 'hc3' must be 'True' or 'False'.\n"
+        if options["cov_type"] not in ["standard", "HC0", "HC1", "HC2", "HC3"]:
+            errstr += "The option 'cov_type' must be one of 'standard', 'HC0', 'HC1', 'HC2' or 'HC3'.\n"
+        elif options["hc3"] is True:
+            if options["cov_type"] not in ["standard", "HC3"]:
+                errstr += "The options hc3=True and cov_type disagree; use one or the other.\n"
+            options["cov_type"] = "HC3"  # hc3 is shorthand for cov_type="HC3" (#52)
         if options["center"] not in [True, False]:
             errstr += "The option 'center' must be 'True' or 'False'.\n"
         if options["quantile"] not in [True, False]:
@@ -1395,6 +1408,11 @@ class Process(object):
                 )
                 modval_parsed[m_var] = [0]
         return modval_parsed
+
+    @property
+    def dv(self):
+        """The name of the dependent variable (the outcome Y). `iv` holds the same value for compatibility."""
+        return self.iv
 
     # API
     def summary(self):
