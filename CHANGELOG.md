@@ -26,6 +26,7 @@ Some reported values change in this release; see the migration notes in
 ### Added
 
 - `statsmodels` is a test dependency (`pip install -e .[test]`).
+- The accuracy suite against PROCESS now also covers model 4, the conditional effects of the moderation-only models 1 to 3, and the index tables of every model where PROCESS 2.16 prints one.
 
 ## [1.0.14] - 2026-09-25
 

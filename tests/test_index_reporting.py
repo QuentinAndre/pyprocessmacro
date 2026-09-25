@@ -83,3 +83,25 @@ def test_index_sections_match_process(model):
         assert ours == {"MMM", "CMM"}
     else:
         assert ours == expected
+
+
+@pytest.mark.parametrize("kind", ["OLS", "Logit"])
+@pytest.mark.parametrize("code, model", [(c, m) for c, models in INDEX_MODELS.items() for m in models])
+def test_index_values_match_process(code, model, kind):
+    txt, data, kwargs = load(model, kind)
+    p = Process(
+        data, model, precision=4, conf=95, modval={}, quantile=False, logit=(kind == "Logit"),
+        seed=123456, suppr_init=True, total=True, hc3=True, **kwargs
+    )
+    ours = getattr(p.indirect_model, f"{code}_index_summary")()
+    expected = parse_index_tables(txt, code)
+    assert len(ours) == len(expected)
+    boot_tol = 1e-2 if kind == "OLS" else 5e-2
+    close = []
+    for _, row in ours.iterrows():
+        key = (row["Moderator"] if code == "PMM" else None, row["Mediator"])
+        ref = expected[key]
+        assert row["Index"] == pytest.approx(ref[0], rel=1e-3, abs=1e-3), key
+        close.extend(np.isclose([row["Boot SE"], row["LLCI"], row["ULCI"]], ref[1:], rtol=boot_tol, atol=boot_tol))
+    # Bootstrap statistics come from different random draws than PROCESS used.
+    assert np.mean(close) > 0.8, np.mean(close)
