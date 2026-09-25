@@ -7,4 +7,4 @@ from .utils import ConvergenceError
 
 __all__ = ["Process", "ConvergenceError"]
 
-__version__ = "1.0.14"
+__version__ = "2.0.0"
