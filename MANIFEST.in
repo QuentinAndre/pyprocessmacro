@@ -1,0 +1,4 @@
+# Keep the sdist library-only. The accuracy tests depend on 14 MB of PROCESS
+# fixture files that are not distributed, so shipping the test module alone
+# would be misleading. Tests run from a git checkout (see .github/workflows).
+prune tests
