@@ -145,3 +145,27 @@ def test_glance_matches_model_summary(fit, model):
             assert row["mcfadden"] == res["mcfadden"] and row["lr_statistic"] == res["d"]
             assert row["p_value"] == res["pvalue"] and row["cov_type"] == "hessian"
             assert np.isnan(row["r_squared"])
+
+
+def test_augment_returns_fitted_values_and_residuals(fit, data):
+    df = data.copy()
+    df.loc[df.index[:5], "med1"] = np.nan
+    p = fit(7, df=df, **SPEC[7])
+    a = p.augment()
+    assert len(a) == len(df) - 5
+    for name in ("effort", "motiv", "med1", "med2", "outcome"):
+        assert name in a.columns
+    assert not any("*" in c or c == "Cons" for c in a.columns)
+    for outcome in p.outcome_models:
+        fitted, resid = a[f".fitted_{outcome}"], a[f".resid_{outcome}"]
+        np.testing.assert_allclose(fitted + resid, a[outcome])
+    only = p.augment(outcome="med1")
+    assert ".fitted_med1" in only.columns and ".fitted_outcome" not in only.columns
+
+
+def test_augment_logit_fitted_values_are_probabilities(fit):
+    p = fit(14, **SPEC[14])
+    a = p.augment(outcome="binary")
+    assert a[".fitted_binary"].between(0, 1).all()
+    assert set(a["binary"].unique()) <= {0, 1}
+    np.testing.assert_allclose(a[".fitted_binary"] + a[".resid_binary"], a["binary"])

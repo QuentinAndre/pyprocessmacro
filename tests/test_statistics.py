@@ -150,3 +150,18 @@ def test_glance_information_criteria_match_statsmodels(fit, data):
     assert g.loc["binary", "aic"] == pytest.approx(logit.aic, rel=1e-6)
     assert g.loc["binary", "bic"] == pytest.approx(logit.bic, rel=1e-6)
     assert g.loc["binary", "df_model"] == logit.df_model
+
+
+# --- #66: augment against statsmodels -----------------------------------------------------------------
+
+
+def test_augment_matches_statsmodels_fitted_values(fit, data):
+    p = fit(4, x="effort", m=["med1"], y="outcome", boot=50)
+    a = p.augment(outcome="outcome")
+    ols = sm.OLS(data["outcome"], design(data, ["effort", "med1"])).fit()
+    np.testing.assert_allclose(a[".fitted_outcome"].to_numpy(), ols.fittedvalues.to_numpy(), rtol=1e-10)
+    np.testing.assert_allclose(a[".resid_outcome"].to_numpy(), ols.resid.to_numpy(), rtol=1e-8, atol=1e-10)
+    q = fit(4, x="effort", m=["med1"], y="binary", logit=True, boot=50)
+    a = q.augment(outcome="binary")
+    logit = sm.Logit(data["binary"], design(data, ["effort", "med1"])).fit(disp=0)
+    np.testing.assert_allclose(a[".fitted_binary"].to_numpy(), np.asarray(logit.predict()), rtol=1e-5)

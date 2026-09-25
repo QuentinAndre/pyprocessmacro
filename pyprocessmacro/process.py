@@ -1498,6 +1498,16 @@ class Process(object):
         """
         return _tidy.glance(self)
 
+    def augment(self, outcome=None):
+        """
+        The analysis data with a `.fitted_<outcome>` and a `.resid_<outcome>` column per outcome model (#66).
+        Rows are those kept after listwise deletion; a logistic outcome appears as the 0/1 recoding it was
+        fitted on, its fitted value is the predicted probability and its residual the response residual.
+
+        :param outcome: None for every outcome model, or the name of one outcome.
+        """
+        return _tidy.augment(self, outcome)
+
     def floodlight_indirect_effect(
             self, med_name, mod_name, other_modval=None, atol=1e-8, rtol=1e-5
     ):
