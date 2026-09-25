@@ -267,6 +267,30 @@ class BaseOutcomeModel(object):
     def _estimate(self):
         pass
 
+    def to_statsmodels(self):
+        """
+        Refit this outcome model with statsmodels and return the results object (#67).
+
+        OLS models use statsmodels.OLS with the same covariance estimator (t-based inference, as here);
+        logistic models use statsmodels.Logit, whose default covariance is the inverse Hessian, as here.
+        statsmodels is an optional dependency: pip install pyprocessmacro[statsmodels].
+        """
+        try:
+            import statsmodels.api as sm
+        except ImportError as error:  # pragma: no cover - exercised with a stubbed module
+            raise ImportError(
+                "to_statsmodels() needs statsmodels: pip install pyprocessmacro[statsmodels]"
+            ) from error
+        results = self.estimation_results
+        exog = pd.DataFrame(self._exog, columns=results["names"])
+        endog = pd.Series(self._endog, name=self._symb_to_var[self._endogvar])
+        if "z" in results:
+            return sm.Logit(endog, exog).fit(disp=0)
+        cov_type = results["cov_type"]
+        if cov_type == "standard":
+            return sm.OLS(endog, exog).fit()
+        return sm.OLS(endog, exog).fit(cov_type=cov_type, use_t=True)
+
 
 class OLSOutcomeModel(BaseOutcomeModel):
     """
