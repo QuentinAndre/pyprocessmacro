@@ -83,3 +83,26 @@ def test_indirect_coeff_summary_is_numeric(fit, kwargs):
     table = fit(model, **SPEC[model], **kwargs).indirect_model.coeff_summary()
     for column in ("Effect", "Boot SE", "BootLLCI", "BootULCI"):
         assert pd.api.types.is_numeric_dtype(table[column]), (column, table[column].dtype)
+
+
+# --- #33: bootstrap export ---------------------------------------------------------------
+
+
+def test_get_bootstrap_estimates(fit):
+    p = fit(8, **SPEC[8])
+    boots = p.get_bootstrap_estimates()
+    n_boot = p.options["boot"]
+    assert list(boots.columns[:2]) == ["BootSample", "OutcomeName"]
+    assert len(boots) == n_boot * (1 + p.n_meds)
+    assert boots.groupby("OutcomeName").size().to_dict() == {"outcome": n_boot, "med1": n_boot, "med2": n_boot}
+    for term in ("Cons", "effort", "motiv", "effort*motiv", "med1", "med2"):
+        assert term in boots.columns, term
+        assert pd.api.types.is_numeric_dtype(boots[term]), term
+    # Mediator equations do not contain the other mediator, so those cells are empty.
+    assert boots.loc[boots["OutcomeName"] == "med1", "med2"].isna().all()
+    assert boots.loc[boots["OutcomeName"] == "outcome", "med2"].notna().all()
+
+
+def test_get_bootstrap_estimates_requires_mediation(fit):
+    with pytest.raises(NotImplementedError):
+        fit(1, **SPEC[1]).get_bootstrap_estimates()

@@ -1393,17 +1393,18 @@ class Process(object):
         boot_betas_y = iem._boot_betas_y
         boot_betas_m = iem._boot_betas_m
 
-        cols_y = [stv[t] for t in iem._exog_terms_y]
-        df = pd.DataFrame(boot_betas_y, columns=cols_y)
-        df["___"] = stv["y"]
+        frames = []
+        df_y = pd.DataFrame(boot_betas_y, columns=[stv[t] for t in iem._exog_terms_y])
+        df_y.insert(0, "OutcomeName", stv["y"])
+        frames.append(df_y)
+        cols_m = [stv[t] for t in iem._exog_terms_m]
         for i in range(self.n_meds):
-            cols_m = [stv[t] for t in iem._exog_terms_m]
             df_m = pd.DataFrame(boot_betas_m[i], columns=cols_m)
-            df_m["___"] = stv[f"m{i + 1}"]
-            df = df.append(df_m)
+            df_m.insert(0, "OutcomeName", stv[f"m{i + 1}"])
+            frames.append(df_m)
+        # One block per outcome. DataFrame.append was removed in pandas 2.0 (#33).
+        df = pd.concat(frames)
         df.index.name = "BootSample"
-        df.insert(0, "OutcomeName", df["___"].values)
-        del df["___"]
         return df.reset_index()
 
     def floodlight_indirect_effect(
