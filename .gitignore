@@ -34,3 +34,6 @@ htmlcov/
 .coverage
 .coverage.*
 .cache/
+
+# Publishing credentials (keep in ~/.pypirc, never in the repository)
+.pypirc
