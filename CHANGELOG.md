@@ -22,6 +22,7 @@ Additive: nothing written against 2.0 stops working.
 ### Changed
 
 - The printed tables are assembled from typed columns instead of a string array coerced back to numbers; same content, no more `to_numeric` round trip (#72).
+- The bootstrap fits resamples in batches with stacked linear algebra instead of one Python iteration per resample, which makes mediation models several times faster. The resample indices are drawn exactly as before, so a given seed still reproduces the same draws and, up to floating-point rounding, the same estimates as 2.0 (#68, resolves #75 for this release).
 
 ### Fixed
 

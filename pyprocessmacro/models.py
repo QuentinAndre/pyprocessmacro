@@ -9,6 +9,7 @@ import scipy.stats as stats
 from numpy import dot
 from numpy.linalg import inv, LinAlgError
 
+from .bootstrap import BootstrapSpec, bootstrap_parameters
 from .utils import (
     fast_OLS,
     fast_optimize,
@@ -698,41 +699,20 @@ class ParallelMediationModel(object):
         Compute the bootstrapped parameters for:
             * The path from the predictors to Y (computed using OLS/Logit, depending on the nature of Y)
             * The path(s) from the mediator(s) to Y (computed using OLS)
-        :return: A tuple of (true_betas_y, true_betas_m)
-            * true_betas_y is a matrix of size n_boots x n_params_y
-            * true_betas_m is a list of matrices of size n_boots x n_params_y
+        :return: A tuple of (boot_betas_y, boot_betas_m, n_fail_samples)
+            * boot_betas_y is a matrix of size n_boots x n_params_y
+            * boot_betas_m is an array of size n_meds x n_boots x n_params_m
+            * n_fail_samples is the number of resamples discarded because an equation could not be estimated
         """
-        n_boots = self._options["boot"]
-        seed = self._options["seed"]
-        boot_betas_y = np.empty((n_boots, len(self._exog_terms_y)))
-        boot_betas_m = np.empty((self._n_meds, n_boots, len(self._exog_terms_m)))
-        n_fail_samples = 0
-        max_failures = n_boots  # give up once more resamples failed than were requested (#49)
-        boot_ind = 0
-        sampler = bootstrap_sampler(self._n_obs, seed)
-        while boot_ind < n_boots:
-            ind = next(sampler)
-            data_boot = self._data[ind, :]
-            y_e = data_boot[:, self._ind_y]
-            y_x = data_boot[:, self._exog_inds_y]
-            try:
-                y_b = self._compute_betas_y(y_e, y_x)
-                m_x = data_boot[:, self._exog_inds_m]
-                boot_betas_y[boot_ind] = y_b
-                for j, m_ind in enumerate(self._inds_m):
-                    m_e = data_boot[:, m_ind]
-                    m_b = self._compute_betas_m(m_e, m_x)
-                    boot_betas_m[j][boot_ind] = m_b
-                boot_ind += 1
-            except (LinAlgError, ConvergenceError):  # X'X or the Hessian is singular, or the logit diverged
-                n_fail_samples += 1
-                if n_fail_samples > max_failures:
-                    raise RuntimeError(
-                        f"{n_fail_samples} bootstrap samples failed to estimate before {n_boots} succeeded. "
-                        "The model is probably not estimable on resamples of this data (check for separation, "
-                        "collinearity, or a very small sample)."
-                    )
-
+        spec = BootstrapSpec(
+            self._ind_y, self._exog_inds_y, self._inds_m, self._exog_inds_m,
+            logit=self._options["logit"], max_iter=self._options["iterate"],
+            tolerance=self._options["convergence"],
+        )
+        # Batched estimation with the same draws as the sequential loop (#68).
+        boot_betas_y, boot_betas_m, n_fail_samples = bootstrap_parameters(
+            self._data, spec, self._options["boot"], self._options["seed"]
+        )
         return boot_betas_y, boot_betas_m, n_fail_samples
 
     def _gen_derivatives(self):
