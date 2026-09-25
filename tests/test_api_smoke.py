@@ -170,3 +170,24 @@ def test_plot_facets_by_second_moderator(fit, facet, shape):
     grid = p.plot_conditional_direct_effects(x="motiv", **{facet: "skill"})
     assert grid.axes.shape == shape
     plt.close("all")
+
+
+# --- #37: floodlight with an unknown moderator name ----------------------------------------
+
+
+def test_floodlight_rejects_unknown_other_moderator(fit):
+    p = fit(10, **SPEC[10])
+    with pytest.raises(ValueError, match="nonexistent"):
+        p.floodlight_direct_effect(mod_name="motiv", other_modval={"nonexistent": 1})
+    with pytest.raises(ValueError, match="nonexistent"):
+        p.floodlight_indirect_effect(med_name="med1", mod_name="motiv", other_modval={"nonexistent": 1})
+
+
+def test_floodlight_runs(fit):
+    p = fit(10, **SPEC[10])
+    direct = p.floodlight_direct_effect(mod_name="motiv", other_modval={"skill": 0.5})
+    indirect = p.floodlight_indirect_effect(med_name="med1", mod_name="motiv", other_modval={"skill": 0.5})
+    for analysis in (direct, indirect):
+        regions = analysis.get_significance_regions()
+        assert set(regions) == {"Negative on", "Positive on"}
+        assert "FLOODLIGHT ANALYSIS" in repr(analysis)

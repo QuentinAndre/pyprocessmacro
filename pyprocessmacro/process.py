@@ -1442,9 +1442,9 @@ class Process(object):
         if other_modval:
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
-                if not mod_symb:
+                if not symb:
                     raise ValueError(
-                        f"The variable {mod_name} is not a variable in the model."
+                        f"The variable {k} is not a variable in the model."
                     )
                 if isinstance(v, list):
                     raise ValueError(
@@ -1512,9 +1512,9 @@ class Process(object):
         if other_modval:
             for k, v in other_modval.items():
                 symb = self._var_to_symb.get(k)
-                if not mod_symb:
+                if not symb:
                     raise ValueError(
-                        f"The variable {mod_name} is not a variable in the model."
+                        f"The variable {k} is not a variable in the model."
                     )
                 if isinstance(v, list):
                     raise ValueError(
