@@ -10,9 +10,11 @@
 #
 # One file per model and outcome, named like the 2.16 files: Results_OLS_ModelN.txt, Results_Logit_ModelN.txt.
 # Options mirror the accuracy tests: 5000 bootstrap resamples, seed 123456, total and contrast effects,
-# HC3 standard errors, six decimals. Effect sizes are requested for the unmoderated mediation models 4 and 6
+# HC3 standard errors, six decimals, and intprobe = 1 so that conditional effects are printed whatever the
+# p-value of the interaction (PROCESS 5 probes only below 0.10 by default; PyProcessMacro always reports them). Effect sizes are requested for the unmoderated mediation models 4 and 6
 # with a continuous outcome. PROCESS 5 has no third or fourth moderator, so models that need one (23 to 27
-# and 30 to 57 in the 2.16 numbering) are skipped with a note in the log.
+# and 30 to 57 in the 2.16 numbering) are skipped with a note in the log, as is model 74, which PROCESS 5
+# rejects as an invalid model number.
 
 args <- commandArgs(trailingOnly = TRUE)
 process_r <- args[1]
@@ -27,7 +29,13 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 moderator_symbols <- c("w", "z", "v", "q")
 
+not_in_process_5 <- c(74)
+
 for (model in models) {
+  if (model %in% not_in_process_5) {
+    cat(sprintf("model %d: skipped, not a model in PROCESS 5\n", model))
+    next
+  }
   data <- read.csv(file.path(root, "tests", "Data", sprintf("Data_Model%d.csv", model)))
   varlist <- strsplit(readLines(file.path(root, "tests", "Data", sprintf("Varlist_Model%d.txt", model)), warn = FALSE)[1], ",")[[1]]
   varlist <- trimws(varlist)
@@ -55,11 +63,14 @@ for (model in models) {
       next
     }
     call_args <- list(data = data, y = y, x = "x", model = model, boot = 5000, seed = 123456,
-                      total = 1, contrast = 1, hc = 3, decimals = 10.6, progress = 0)
+                      total = 1, contrast = 1, hc = 3, intprobe = 1, decimals = 10.6, progress = 0)
     if (!is.null(mediators)) call_args$m <- mediators
     if (length(moderators) >= 1) call_args$w <- moderators[1]
     if (length(moderators) >= 2) call_args$z <- moderators[2]
     if (model %in% c(4, 6) && outcome == "ols") call_args$effsize <- 1
+    # PROCESS 5.0 fails with "object dfres not found" when it probes a three-way interaction for a
+    # logistic outcome, so model 3 with the binary outcome keeps the default probing threshold.
+    if (model == 3 && outcome == "logit") call_args$intprobe <- NULL
 
     started <- Sys.time()
     header <- c(
