@@ -2,8 +2,9 @@
 Comparison with PROCESS for R version 5 (tests/Results/v5), the reference for the 3.x parity work.
 
 Feature parity with PROCESS 5 is a 3.x target (#82). These tests therefore assert only what the 2.x
-releases already claim to reproduce, fitted with version="5.0" (#87), which gives PROCESS 5's percentile
-intervals and computes its spotlight values (the 16th, 50th and 84th percentiles) the way it does:
+releases already claim to reproduce, fitted with percent=True and spotlight="percentiles" (#87, #90), the
+two options that give PROCESS 3 and later's percentile intervals and compute its spotlight values (the 16th,
+50th and 84th percentiles) the way it does:
 
 * outcome models: coefficients, standard errors, t or Z, p-values and intervals;
 * direct and conditional direct effects;
@@ -44,8 +45,8 @@ DIFFERENCES = {
     "models 23 to 27 and 30 to 57": "PROCESS 5 has no models with three or four moderators; 2.x keeps them as in 2.16.",
 }
 
-# The files were generated with intprobe=1 so that every conditional table exists. version="5.0" gates the
-# printed table of models 1 to 3 the way PROCESS does; the tables compared here are computed regardless.
+# The files were generated with intprobe=1 so that every conditional table exists. intprobe gates the printed
+# table of models 1 to 3 the way PROCESS does; the tables compared here are computed regardless.
 
 OUTCOME_TOL = dict(rtol=2e-4, atol=1e-6)   # six printed decimals; different linear algebra
 BOOT_TOL = {"OLS": 5e-2, "Logit": 1e-1}   # different resampler: agreement within Monte Carlo error
@@ -65,7 +66,7 @@ def cache():
 
 
 def fitted(model, kind, cache):
-    """The parsed PROCESS 5 output and a Process fitted with matching options under version="5.0"."""
+    """The parsed PROCESS 5 output and a Process fitted with matching options and the PROCESS 3+ conventions."""
     key = (model, kind)
     if key not in cache:
         txt, data, kwargs = load(model, kind)
@@ -73,7 +74,8 @@ def fitted(model, kind, cache):
             parsed = parse(f.read())
         effsize = model in (4, 6) and kind == "OLS"
         p = Process(data, model, boot=5000, seed=123456, conf=95, total=True, contrast=True, hc3=True,
-                    version="5.0", logit=(kind == "Logit"), effsize=effsize, suppr_init=True, **kwargs)
+                    percent=True, spotlight="percentiles", logit=(kind == "Logit"), effsize=effsize,
+                    suppr_init=True, **kwargs)
         cache[key] = (parsed, p)
     return cache[key]
 

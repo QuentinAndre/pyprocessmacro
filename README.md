@@ -30,8 +30,8 @@ softwaress. PyProcessMacro is released under a MIT license.
 In the current version, PyProcessMacro replicates the following features from the original Process Macro v2.16:
   * All models (1 to 76) are supported and tested for accuracy against the output of the original Process macro
   2.16 (see `tests/test_models_accuracy.py`). The 42 models that PROCESS 5 still defines are also compared to the
-  output of PROCESS for R 5.0 (see `tests/test_process5.py`), and the `version` argument selects which release's
-  conventions to reproduce (section 1.I).
+  output of PROCESS for R 5.0 (see `tests/test_process5.py`); section 1.I says which defaults changed between
+  PROCESS 2 and PROCESS 3 and how to match either.
   * Estimation of binary/continuous outcome variables. The binary outcomes are estimated in Logit using the 
   Newton-Raphson convergence algorithm, the continuous variables are estimated using OLS.
   * All statistics reported by Process: 
@@ -243,14 +243,16 @@ It goes without saying that this will return an error if your DV is not dichotom
 
 ### D. Specifying custom spotlight values for the moderator(s)
 
-The spotlight values of the moderators depend on the PROCESS version emulated (see section 1.I):
-* Under `version="2.16"` (the default), a continuous moderator is probed at M - 1SD, M and M + 1SD, where M and SD
-are its mean and standard deviation, and a moderator with at most five distinct values is probed at each of them.
-* Under `version="5.0"`, a continuous moderator is probed at its 16th, 50th and 84th percentiles, computed as
-PROCESS does, and a dichotomous moderator at its two values.
-* `quantile=True` probes a continuous moderator at its 10th, 25th, 50th, 75th and 90th percentiles (the `quantile`
-option of PROCESS 2) and `moments=True` at M - 1SD, M and M + 1SD (the `moments` option of PROCESS 5), whatever
-the version.
+The spotlight values of the moderators follow the `spotlight` option (section 1.I says which PROCESS release each
+rule is the default of):
+* `spotlight="moments"` (the default, and the PROCESS 2 rule): a continuous moderator is probed at M - 1SD, M and
+M + 1SD, where M and SD are its mean and standard deviation.
+* `spotlight="percentiles"` (the PROCESS 3 and later rule): a continuous moderator is probed at its 16th, 50th and
+84th percentiles, computed as PROCESS does.
+* `spotlight="quantiles"` (or `quantile=True`, the `quantile` option of PROCESS 2): the 10th, 25th, 50th, 75th and
+90th percentiles.
+* A dichotomous moderator is probed at its two values under every rule; under `"moments"` and `"quantiles"` a
+moderator with at most five distinct values is probed at each of them.
 
 In Process, custom spotlight values can be applied to each moderator q, v, z, ... through the arguments qmodval, 
 vmodval, zmodval... 
@@ -321,38 +323,37 @@ p = Process(data=df, model=4, x="Effort", y="Success", m=["MediationSkills"], ef
 p.indirect_model.effect_size_summary()
 ````
 
-### I. Reproducing the conventions of a PROCESS release
+### I. Which PROCESS release do the defaults follow?
 
-PROCESS 2 and PROCESS 3 to 5 differ in a few defaults that change the numbers in the output. The `version`
-argument selects which release to follow, so that an analysis run with either can be reproduced:
+PyProcessMacro's defaults are those of PROCESS 2.16, the release its accuracy tests were written against. PROCESS
+3.0 (December 2017) changed three of them, and no later release changed them again (Hayes's release notes for
+3.0 to 5.0; the sources are listed in issue #90):
 
-| | `version="2.16"` (default) | `version="5.0"` |
-|---|---|---|
-| Bootstrap confidence intervals | bias-corrected | percentile |
-| Spotlight values of a continuous moderator | mean and one SD either side | 16th, 50th and 84th percentiles |
-| Discrete moderator probed at its values | when it has at most five | when it has two |
-| Conditional effects of Models 1 to 3 | always reported | reported when the interaction's p is at most `intprobe=0.10` |
-| Models | 1 to 76 | 1 to 76, with a note for the ones PROCESS retired |
+| | PROCESS 2 (PyProcessMacro default) | PROCESS 3 and later | Option |
+|---|---|---|---|
+| Bootstrap confidence intervals | bias-corrected | percentile | `percent=True` |
+| Spotlight values of a continuous moderator | mean and one SD either side | 16th, 50th and 84th percentiles | `spotlight="percentiles"` |
+| Conditional effects of Models 1 to 3 | always reported | reported when the interaction's p is at most 0.10 | `intprobe=0.10` |
 
-Any argument passed explicitly wins over the version's default (`percent`, `quantile`, `moments`, `modval`,
-`intprobe`). The initialization banner and the first line of `summary()` state the conventions in force. Models
-23 to 27 and 30 to 57 (third and fourth moderators) were retired in PROCESS 3.0 and Model 74 in PROCESS 4.0;
-PyProcessMacro estimates them under every version as PROCESS 2.16 defined them, so that older results remain
-reproducible, and says so in a note that is also raised as a `UserWarning`. Mediation models report their conditional direct and
-indirect effects under both versions, as PROCESS does; `intprobe` only concerns the moderation-only models, whose
-conditional effects stay available from `direct_model.coeff_summary()` when they are not printed.
+To reproduce an analysis run with PROCESS 3, 4 or 5, pass `percent=True` and `spotlight="percentiles"`.
+`intprobe` only changes whether the conditional-effects table of a moderation-only model is printed; the table
+stays available from `direct_model.coeff_summary()`. The initialization banner and the first line of `summary()`
+state the conventions in force and the release each is the default of, so a saved output says how its numbers
+were produced. The bootstrap draws themselves cannot match PROCESS's, whose SPSS, SAS and R versions use different
+random generators, so bootstrap intervals agree within Monte Carlo error only.
+
+Models 23 to 27 and 30 to 57 (third and fourth moderators) were retired in PROCESS 3.0 and Model 74 in PROCESS
+4.0, and none exists in PROCESS 5. PyProcessMacro estimates them as PROCESS 2.16 defined them, so that older
+results remain reproducible, and says so in a note that is also raised as a `UserWarning`.
 
 ````python
-p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["MediationSkills"], version="5.0")
-p.summary()  # starts with: PROCESS version: 5.0. Bootstrap intervals: percentile. Moderators at the 16th, ...
+p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["MediationSkills"],
+            percent=True, spotlight="percentiles")
+p.summary()  # starts with: Bootstrap intervals: percentile (PROCESS 3 and later default). Moderators at the ...
 ````
 
-Versions `"3.0"` to `"3.5"` and `"4.0"` to `"4.3"` (and `"3"`, `"4"` for the last release of a major) are accepted
-too and share the conventions of 5.0: Hayes's release notes record no change to the interval type, the spotlight
-values or the probing threshold since 3.0 (December 2017), which is when they moved away from the 2.16 ones. Pass
-the release you used and the output names it; the numbers are checked against the PROCESS 5.0 output files.
-
-The 2.16 conventions stay the default throughout the 2.x releases; 3.0 will switch the default to `"5.0"`.
+The PROCESS 2 defaults stay through the 2.x releases; 3.0 will switch `percent` and `spotlight` to the PROCESS 3
+values.
 
 ## 2. Accessing the estimation results
 
