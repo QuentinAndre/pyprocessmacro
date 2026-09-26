@@ -46,7 +46,26 @@ class Process(object):
         "logit",
         "modval",
         "controls",
+        "version",
+        "intprobe",
+        "moments",
     }
+
+    # The conventions of the PROCESS releases whose output the test suite holds (#87): the value an argument
+    # left at None takes, the spotlight rule for continuous moderators, the probing threshold of models 1 to 3,
+    # and the model numbers the release accepts. PROCESS 3 dropped the third and fourth moderators (models 23
+    # to 27 and 30 to 57 of the 2.16 numbering) and PROCESS 4.2 discontinued model 74 in favour of the xmint
+    # option of model 4, which reports counterfactual natural effects instead.
+    VERSIONS = {
+        "2.16": {"percent": False, "spotlight": "moments", "intprobe": 1.0, "models": set(range(1, 77))},
+        "5.0": {
+            "percent": True,
+            "spotlight": "percentiles",
+            "intprobe": 0.10,
+            "models": set(range(1, 77)) - set(range(23, 28)) - set(range(30, 58)) - {74},
+        },
+    }
+    VERSION_ALIASES = {"2": "2.16", "5": "5.0"}
 
     __models_vars__ = {
         1: {"x", "m", "y"},
@@ -573,12 +592,15 @@ class Process(object):
             center=False,
             quantile=False,
             detail=True,
-            percent=False,
+            percent=None,
             logit=False,
             iterate=10000,
             convergence=0.000_000_01,
             precision=4,
             suppr_init=False,
+            version="2.16",
+            intprobe=None,
+            moments=False,
             **kwargs,
     ):
         """
@@ -595,8 +617,8 @@ class Process(object):
         :param modval: dict
             The keys of the dictionary are the name of the variables specified as moderators in the model, and the value
             should be a list of spotlight values for this moderator.
-            If a key does not exist in the dictionary, the default spotlight values (quantile or +/- 1SD from the mean,
-            see the 'quantile' argument) will be used.
+            If a key does not exist in the dictionary, the spotlight values follow the rule of the PROCESS version
+            emulated (see 'version', 'quantile' and 'moments').
         :param cluster: string
             A variable name that uniquely identifies each of the individuals in the data. Used to generate fixed effects
             for repeated-measures designs.
@@ -633,14 +655,20 @@ class Process(object):
         :param center: bool
             If True, the moderator(s) and variable(s) they moderate will be mean-centered.
         :param quantile: bool
-            If True, the spotlight values for each of the moderators will be the [10, 25, 50, 75, 90]
-            percentile values of the variable. If False, the spotlight values are equal to
-            [M - SD, M, M + SD] for the variable.
+            If True, the spotlight values of each continuous moderator are its 10th, 25th, 50th, 75th and 90th
+            percentiles (the quantile option of PROCESS 2). If False, they follow the rule of the PROCESS version
+            emulated: the mean and one standard deviation either side under version "2.16", the 16th, 50th and
+            84th percentiles under version "5.0".
+        :param moments: bool
+            If True, the spotlight values of each continuous moderator are the mean and one standard deviation
+            either side whatever the version (the moments option of PROCESS 5). Cannot be combined with quantile.
         :param detail: bool
             If True, a summary will be printed for each outcome model. If False, this summary will be omitted, and
             only the direct/indirect effects will be printed.
-        :param percent: bool
-            If True, percentile-based CIs are returned for the indirect effect, instead of bias-corrected CIs.
+        :param percent: bool or None
+            If True, percentile bootstrap confidence intervals are reported for the indirect effects; if False,
+            bias-corrected intervals. None (the default) follows the PROCESS version emulated: bias-corrected
+            under "2.16", percentile under "5.0".
         :param logit: bool
             If True, and if the outcome is a binary variable, then a logistic regression will be used to
             estimate the parameters of its equation.
@@ -651,6 +679,19 @@ class Process(object):
             Newton-Raphson algorithm of the logistic regression.
         :param precision:
             The number of decimal places to display in the summary of the model results.
+        :param version: "2.16" or "5.0"
+            The PROCESS release whose conventions to reproduce (#87): the type of bootstrap interval, the
+            spotlight values of continuous moderators, the probing threshold of models 1 to 3, and the model
+            numbers accepted. An argument passed explicitly always wins over the version's default. "2.16",
+            the default, is what PyProcessMacro has always produced; "5.0" reproduces PROCESS for R 5.0, which
+            refuses models 23 to 27, 30 to 57 and 74. The conventions in force are stated in the initialization
+            banner and at the top of summary().
+        :param intprobe: float between 0 and 1, or None
+            Models 1 to 3 report their conditional effects only when the p-value of the highest-order
+            interaction of X is at most intprobe, as PROCESS 3 and later do. None follows the version: 1 under
+            "2.16" (always reported), 0.10 under "5.0". The conditional effects are computed either way and
+            remain available from direct_model.coeff_summary(). Mediation models always report their conditional
+            direct and indirect effects, as PROCESS does.
         """
         if mc:
             warnings.warn(
@@ -723,8 +764,9 @@ class Process(object):
         self._data = data
         arguments = locals()
 
-        # Validate the arguments supplied as options
+        # Validate the arguments supplied as options, and resolve the defaults the PROCESS version sets (#87)
         self.options = self._gen_valid_options(arguments)
+        self.version = self.options["version"]
 
         # Check the congruence between the model specifications, the model number, and the data, and store the final
         # list of variables used
@@ -858,7 +900,27 @@ class Process(object):
         if options["center"] not in [True, False]:
             errstr += "The option 'center' must be 'True' or 'False'.\n"
         if options["quantile"] not in [True, False]:
-            errstr += "The option 'jn' must be 'True' or 'False'.\n"
+            errstr += "The option 'quantile' must be 'True' or 'False'.\n"
+        if options["moments"] not in [True, False]:
+            errstr += "The option 'moments' must be 'True' or 'False'.\n"
+        elif options["quantile"] is True and options["moments"] is True:
+            errstr += (
+                "The options 'quantile' and 'moments' are two rules for the spotlight values; use one or the other.\n"
+            )
+        if options["percent"] not in [None, True, False]:
+            errstr += "The option 'percent' must be None, 'True' or 'False'.\n"
+        intprobe = options["intprobe"]
+        if intprobe is not None and (
+                isinstance(intprobe, bool) or not isinstance(intprobe, (int, float, np.number)) or not 0 <= intprobe <= 1
+        ):
+            errstr += "The option 'intprobe' must be None or a number between 0 and 1.\n"
+        version = self.VERSION_ALIASES.get(str(options["version"]), str(options["version"]))
+        if version not in self.VERSIONS:
+            errstr += (
+                f"The option 'version' must be one of {', '.join(repr(v) for v in self.VERSIONS)}, the PROCESS "
+                "releases whose output PyProcessMacro is tested against.\n"
+            )
+        options["version"] = version
         if options["jn"] not in [True, False]:
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["logit"] not in [True, False]:
@@ -883,6 +945,41 @@ class Process(object):
             {errstr}
             """
             )
+        return self._resolve_version(options)
+
+    def _resolve_version(self, options):
+        """
+        Check the model number against the PROCESS version emulated, and fill in the arguments left at None
+        with that version's defaults (#87). The rule for the spotlight values is stored under "spotlight".
+        """
+        conventions = self.VERSIONS[options["version"]]
+        if self.model_num not in self.__models_vars__:
+            raise ValueError(
+                f"Model {self.model_num} is not a PROCESS model number: PyProcessMacro implements models 1 to 76."
+            )
+        if self.model_num not in conventions["models"]:
+            if self.model_num == 74:
+                reason = ("PROCESS 4.2 replaced it with the xmint option of model 4, which reports counterfactual "
+                          "natural effects instead")
+            else:
+                reason = ("PROCESS 3 and later have no third or fourth moderator (models 23 to 27 and 30 to 57 "
+                          "of PROCESS 2)")
+            raise ValueError(
+                f"Model {self.model_num} does not exist in PROCESS {options['version']}: {reason}. "
+                "Pass version='2.16' to estimate it as PROCESS 2.16 defined it."
+            )
+        if options["percent"] is None:
+            options["percent"] = conventions["percent"]
+        if options["intprobe"] is None:
+            options["intprobe"] = conventions["intprobe"]
+        else:
+            options["intprobe"] = float(options["intprobe"])
+        if options["quantile"]:
+            options["spotlight"] = "quantiles"
+        elif options["moments"]:
+            options["spotlight"] = "moments"
+        else:
+            options["spotlight"] = conventions["spotlight"]
         return options
 
     def _gen_valid_varlist(self, var_kwargs):
@@ -1142,10 +1239,12 @@ class Process(object):
     def _gen_spotlight_values(self, modval_symb):
         """
         Generate the spotlight values of the moderators.
-        The function first search the dictionary 'modval' for custom spotlight values.
-        If they cannot be found, it uses discrete values if the moderator is discrete.
-        If the moderator is not discrete, is uses quantiles or mean +/- 1SD, depending on the options specified
-        in the Process object.
+        Custom values from 'modval' come first. Otherwise a discrete moderator is probed at its values: every
+        value when it has at most five under version "2.16" (PyProcessMacro's historical rule), its two values
+        when it is dichotomous under any version (PROCESS's rule). A continuous moderator follows the rule in
+        options["spotlight"] (#87): "moments" for the mean and one standard deviation either side, "percentiles"
+        for the 16th, 50th and 84th percentiles computed as PROCESS 3 and later do (sorted values interpolated at
+        position p(n + 1), R's quantile type 6), "quantiles" for the 10th, 25th, 50th, 75th and 90th percentiles.
         :param modval_symb: dict
             A dictionary {'mod_symb':[mod_values]} of custom spotlight values for the moderator(s)
         :return: dict
@@ -1153,21 +1252,26 @@ class Process(object):
         """
         spot_values = {}
         data = self._data.values
+        rule = self.options["spotlight"]
         for mod in self._moderators["all"]:
             index = self._symb_to_ind[mod]
             val = data[:, index]
             spotvals = modval_symb.get(mod, [])
-            if not spotvals:
-                if len(np.unique(val)) <= 5:
-                    spot_values[mod] = np.unique(val)
-                elif self.options["quantile"]:
-                    spot_values[mod] = np.percentile(val, [10, 25, 50, 75, 90])
-                else:
-                    m = val.mean()
-                    std = val.std(ddof=1)
-                    spot_values[mod] = [m - std, m, m + std]
-            else:
+            uniques = np.unique(val)
+            if spotvals:
                 spot_values[mod] = spotvals
+            elif len(uniques) <= 5 and self.options["version"] == "2.16":
+                spot_values[mod] = uniques
+            elif len(uniques) == 2:
+                spot_values[mod] = uniques
+            elif rule == "quantiles":
+                spot_values[mod] = np.percentile(val, [10, 25, 50, 75, 90])
+            elif rule == "percentiles":
+                spot_values[mod] = np.percentile(val, [16, 50, 84], method="weibull")
+            else:
+                m = val.mean()
+                std = val.std(ddof=1)
+                spot_values[mod] = [m - std, m, m + std]
         return spot_values
 
     def _gen_direct_effect_model(self):
@@ -1225,7 +1329,8 @@ class Process(object):
             "Process successfully initialized.\n"
             "Based on the Process Macro by Andrew F. Hayes, Ph.D. (www.afhayes.com)\n\n"
             "\n****************************** SPECIFICATION ****************************\n\n"
-            f"Model = {self.model_num}\n\n"
+            f"Model = {self.model_num}\n"
+            f"{self._conventions_text()}\n\n"
             "Variables:"
         )
         parameters = [
@@ -1415,6 +1520,27 @@ class Process(object):
         """The name of the dependent variable (the outcome Y). `iv` holds the same value for compatibility."""
         return self.iv
 
+    def _conventions_text(self):
+        """One line naming the PROCESS version emulated and the conventions in force after any override (#87)."""
+        o = self.options
+        parts = [f"PROCESS version: {o['version']}."]
+        if self.has_mediation:
+            parts.append(f"Bootstrap intervals: {'percentile' if o['percent'] else 'bias-corrected'}.")
+        if self._moderators["all"]:
+            spotlight = {
+                "moments": "mean and one SD either side",
+                "percentiles": "16th, 50th and 84th percentiles",
+                "quantiles": "10th, 25th, 50th, 75th and 90th percentiles",
+            }[o["spotlight"]]
+            custom = sorted(o["modval"])
+            if custom:
+                spotlight += f" (custom values for {', '.join(custom)})"
+            parts.append(f"Moderators at the {spotlight}.")
+        if not self.has_mediation:
+            probing = "always" if o["intprobe"] >= 1 else f"when the interaction's p is at most {o['intprobe']:g}"
+            parts.append(f"Conditional effects reported: {probing}.")
+        return " ".join(parts)
+
     # API
     def summary(self):
         """
@@ -1427,7 +1553,7 @@ class Process(object):
 
     def _summary_text(self):
         with pd.option_context("display.precision", self.options["precision"]):
-            parts = []
+            parts = [self._conventions_text() + "\n"]
             full_model = self.outcome_models[self.iv]
             m_models = [
                 self.outcome_models.get(med_name) for med_name in self.mediators
@@ -1466,7 +1592,7 @@ class Process(object):
         """The tables of the summary as HTML, for notebooks (#71)."""
         precision = self.options["precision"]
         fmt = f"{{:.{precision}f}}".format
-        html = [f"<h3>PROCESS Model {self.model_num}</h3>"]
+        html = [f"<h3>PROCESS Model {self.model_num}</h3>", f"<p>{self._conventions_text()}</p>"]
         if self.options["detail"]:
             for name, model in self.outcome_models.items():
                 html.append(f"<h4>Outcome: {name}</h4>")
@@ -1483,9 +1609,11 @@ class Process(object):
             if self.options.get("effsize"):
                 html.append("<h4>Standardized indirect effect(s)</h4>")
                 html.append(self.indirect_model.effect_size_summary().to_html(float_format=fmt))
-        else:
+        elif self.direct_model.probed:
             html.append("<h4>Conditional effect(s)</h4>")
             html.append(self.direct_model.coeff_summary().to_html(float_format=fmt))
+        else:  # PROCESS 3 and later probe only below intprobe (#87)
+            html.append(f"<p>{self.direct_model._not_probed_text()}</p>")
         return "\n".join(html)
 
     def get_bootstrap_estimates(self):
