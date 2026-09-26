@@ -2,8 +2,8 @@
 Comparison with PROCESS for R version 5 (tests/Results/v5), the reference for the 3.x parity work.
 
 Feature parity with PROCESS 5 is a 3.x target (#82). These tests therefore assert only what the 2.x
-releases already claim to reproduce, fitted at PROCESS 5's own moderator values with percentile
-intervals:
+releases already claim to reproduce, fitted with version="5.0" (#87), which gives PROCESS 5's percentile
+intervals and computes its spotlight values (the 16th, 50th and 84th percentiles) the way it does:
 
 * outcome models: coefficients, standard errors, t or Z, p-values and intervals;
 * direct and conditional direct effects;
@@ -25,29 +25,27 @@ import pytest
 
 from pyprocessmacro import Process
 from tests.test_index_reporting import load
-from tests.v5_output import moderator_values, parse
+from tests.v5_output import parse
 
 pytestmark = pytest.mark.v5
 
 V5_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Results", "v5")
 
 DIFFERENCES = {
-    "intervals": "PROCESS 5 reports percentile bootstrap intervals by default; 2.x bias-corrected (#74).",
-    "spotlight values": "PROCESS 5 probes continuous moderators at the 16th, 50th and 84th percentiles; "
-                        "2.x at the mean and plus or minus one standard deviation.",
     "conditional contrasts": "PROCESS 5 prints pairwise contrasts between conditional indirect effects; 2.x does not.",
     "interaction tests": "PROCESS 5 prints R-squared-change tests of the highest-order interaction; 2.x does not.",
     "total effect model": "PROCESS 5 prints a total-effect model for the unmoderated mediation models; 2.x does not.",
     "standardized direct": "PROCESS 5 prints standardized total and direct effects (c_cs, c'_cs) with effsize; 2.x does not.",
     "partially standardized": "PROCESS 5 no longer prints partially standardized indirect effects; 2.x does (#70).",
     "model 6 path order": "PROCESS 5 orders serial paths by length before first mediator; 2.x follows 2.16.",
-    "probing": "PROCESS 5 probes an interaction only when its p-value is below intprobe (0.10 by default); 2.x always "
-               "reports conditional effects. The files were generated with intprobe=1.",
     "logit three-way probing": "PROCESS 5.0 fails (object dfres not found) when probing a three-way interaction on a "
                                "logistic outcome, so the Logit Model 3 file has no conditional table (default probing).",
     "model 74": "PROCESS 5 has no model 74 (invalid model number); 2.x keeps it as defined in 2.16.",
     "models 23 to 27 and 30 to 57": "PROCESS 5 has no models with three or four moderators; 2.x keeps them as in 2.16.",
 }
+
+# The files were generated with intprobe=1 so that every conditional table exists. version="5.0" gates the
+# printed table of models 1 to 3 the way PROCESS does; the tables compared here are computed regardless.
 
 OUTCOME_TOL = dict(rtol=2e-4, atol=1e-6)   # six printed decimals; different linear algebra
 BOOT_TOL = {"OLS": 5e-2, "Logit": 1e-1}   # different resampler: agreement within Monte Carlo error
@@ -67,17 +65,15 @@ def cache():
 
 
 def fitted(model, kind, cache):
-    """The parsed PROCESS 5 output and a Process fitted with matching options at PROCESS's moderator values."""
+    """The parsed PROCESS 5 output and a Process fitted with matching options under version="5.0"."""
     key = (model, kind)
     if key not in cache:
         txt, data, kwargs = load(model, kind)
         with open(os.path.join(V5_DIR, f"Results_{kind}_Model{model}.txt"), encoding="utf-8") as f:
             parsed = parse(f.read())
-        moderators = [v for v in ("m", "w", "z", "v", "q") if v in data.columns and (model <= 3 or v != "m")]
-        modval = moderator_values(parsed, moderators)
         effsize = model in (4, 6) and kind == "OLS"
         p = Process(data, model, boot=5000, seed=123456, conf=95, total=True, contrast=True, hc3=True,
-                    percent=True, logit=(kind == "Logit"), modval=modval, effsize=effsize, suppr_init=True, **kwargs)
+                    version="5.0", logit=(kind == "Logit"), effsize=effsize, suppr_init=True, **kwargs)
         cache[key] = (parsed, p)
     return cache[key]
 
