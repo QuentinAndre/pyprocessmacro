@@ -65,4 +65,5 @@ include = ["pyprocessmacro*"]
 testpaths = ["tests"]
 markers = [
   "smoke: fast checks of the public API, suitable for every push",
+  "v5: comparison with the PROCESS 5 output files in tests/Results/v5",
 ]
