@@ -20,6 +20,7 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The bootstrap fits resamples in cache-sized batches (100 000 values per chunk instead of 10 million): 1.5 to 3.5 times faster than one-by-one fits, where the 2.1 setting was no faster and slower beyond a few thousand observations. Same draws, same results (#96).
 - The error for an invalid `quantile` value named the wrong option.
 
 ### Fixed

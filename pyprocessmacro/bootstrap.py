@@ -13,8 +13,10 @@ from numpy.linalg import LinAlgError
 from . import negbin
 from .utils import ConvergenceError, bootstrap_sampler, fast_OLS, fast_optimize
 
-# Upper bound on the number of floating-point values held by one chunk of resampled data.
-CHUNK_ELEMENTS = 10_000_000
+# Upper bound on the number of floating-point values held by one chunk of resampled data. Chunks of this size
+# stay in cache: measured on 2026-09-26 (#96), the batched estimators are then 1.5 to 3.5 times faster than
+# one-by-one fits, whereas the 10 million bound shipped in 2.1 made them memory-bound and no faster.
+CHUNK_ELEMENTS = 100_000
 
 
 def family_of(options):
