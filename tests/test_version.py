@@ -3,8 +3,8 @@ The version argument (#87): the conventions of PROCESS 2.16 (the default) and of
 
 The 2.16 output files in tests/Results and the 5.0 files in tests/Results/v5 are the reference for each
 version's numbers (test_models_accuracy.py, test_process5.py). These tests cover the resolution of the
-defaults, the spotlight rules, the probing threshold of models 1 to 3, and the model numbers each version
-accepts.
+defaults, the spotlight rules, the probing threshold of models 1 to 3, and the note for the models a later
+PROCESS release retired, which every version estimates.
 """
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ from pyprocessmacro import Process
 M1 = dict(x="effort", m="motiv", y="outcome")
 M1_NULL = dict(x="effort", m="qual", y="outcome")  # qual plays no part in the outcome: a weak interaction
 M4 = dict(x="effort", m=["med1"], y="outcome")
-ABSENT_FROM_5 = {
+RETIRED = {
     23: dict(x="effort", m=["med1"], w="motiv", z="skill", v="value", y="outcome"),
     30: dict(x="effort", m=["med1"], w="motiv", z="skill", v="value", y="outcome"),
     57: dict(x="effort", m=["med1"], w="motiv", z="skill", v="value", q="qual", y="outcome"),
@@ -107,18 +107,23 @@ def test_unknown_model_number_raises(fit):
         fit(99, **M1)
 
 
-@pytest.mark.parametrize("model", sorted(ABSENT_FROM_5))
-def test_models_absent_from_process_5_raise_and_stay_available_under_2_16(fit, model):
-    with pytest.raises(ValueError, match=f"Model {model} does not exist in PROCESS 5.0"):
-        fit(model, version="5.0", **ABSENT_FROM_5[model])
-    p = fit(model, version="2.16", **ABSENT_FROM_5[model])
-    assert p.model_num == model and p.version == "2.16"
+@pytest.mark.parametrize("model", sorted(RETIRED))
+@pytest.mark.parametrize("version", ["2.16", "5.0"])
+def test_retired_models_are_estimated_under_every_version_with_a_note(fit, model, version):
+    release = "4.0" if model == 74 else "3.0"
+    with pytest.warns(UserWarning, match=f"Model {model} was retired in PROCESS {release}"):
+        p = fit(model, version=version, **RETIRED[model])
+    assert p.version == version
+    assert p.retired_note.startswith(f"Note: Model {model} was retired in PROCESS {release}")
+    assert p.retired_note in p.summary()
+    assert len(p.indirect_model.coeff_summary()) > 0
 
 
 @pytest.mark.parametrize("version", ["2.16", "5.0"])
 def test_shared_models_fit_under_both_versions(fit, version):
     p = fit(7, version=version, x="effort", w="motiv", m=["med1"], y="outcome")
     assert p.version == version and p.indirect_model._analysis_list == ["MM"]
+    assert p.retired_note is None and "retired" not in p.summary()
 
 
 # --- spotlight rules for discrete moderators ----------------------------------------------------------

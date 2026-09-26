@@ -332,13 +332,13 @@ argument selects which release to follow, so that an analysis run with either ca
 | Spotlight values of a continuous moderator | mean and one SD either side | 16th, 50th and 84th percentiles |
 | Discrete moderator probed at its values | when it has at most five | when it has two |
 | Conditional effects of Models 1 to 3 | always reported | reported when the interaction's p is at most `intprobe=0.10` |
-| Models accepted | 1 to 76 | 1 to 22, 28, 29, 58 to 73, 75 and 76 |
+| Models | 1 to 76 | 1 to 76, with a note for the ones PROCESS retired |
 
 Any argument passed explicitly wins over the version's default (`percent`, `quantile`, `moments`, `modval`,
 `intprobe`). The initialization banner and the first line of `summary()` state the conventions in force. Models
-23 to 27 and 30 to 57 (third and fourth moderators) and Model 74 do not exist in PROCESS 5, which refuses them;
-PyProcessMacro does the same under `version="5.0"` and keeps estimating them as PROCESS 2.16 defined them under
-`version="2.16"`, so that older results remain reproducible. Mediation models report their conditional direct and
+23 to 27 and 30 to 57 (third and fourth moderators) were retired in PROCESS 3.0 and Model 74 in PROCESS 4.0;
+PyProcessMacro estimates them under every version as PROCESS 2.16 defined them, so that older results remain
+reproducible, and says so in a note that is also raised as a `UserWarning`. Mediation models report their conditional direct and
 indirect effects under both versions, as PROCESS does; `intprobe` only concerns the moderation-only models, whose
 conditional effects stay available from `direct_model.coeff_summary()` when they are not printed.
 
