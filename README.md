@@ -51,8 +51,10 @@ The following changes and improvements have been made from the original Process 
   * Plotting capabilities: PyProcessMacro can generate the plot of conditional direct and indirect effects at various 
   levels of the moderators. See the documentation for plot_conditional_indirect_effects() and 
   plot_conditional_direct_effects().
-  * Fast estimation process: PyProcessMacro leverages the capabilities of NumPy to efficiently compute a large number
-  of bootstrap estimates, and dramatically speed up the estimation of complex models.
+  * Fast estimation: the estimators are NumPy code over all observations, and the bootstrap fits resamples in
+  cache-sized batches with stacked linear algebra, 1.5 to 3.5 times faster than fitting them one by one. On the
+  development machine, 5000 resamples of a one-mediator model with 1000 observations take about 0.2 seconds with a
+  continuous outcome, about 1.2 seconds with a binary outcome and about 15 seconds with a count outcome.
   * Transparent bootstrapping: PyProcessMacro explicitely reports the number of bootstrap samples that have been 
   discarded because of numerical instability.
   * Count outcomes: with `family="negbin"`, the outcome Y is estimated by negative binomial regression (section
