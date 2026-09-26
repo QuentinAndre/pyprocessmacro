@@ -28,9 +28,10 @@ softwaress. PyProcessMacro is released under a MIT license.
 # Features
 
 In the current version, PyProcessMacro replicates the following features from the original Process Macro v2.16:
-  * All models (1 to 76) are supported. Models 1 to 5 and 7 to 76 are tested for accuracy against the output of the
-  original Process macro (see `tests/test_models_accuracy.py`); Model 6 (serial mediation, added in 2.1) is tested
-  against statsmodels-based reference computations.
+  * All models (1 to 76) are supported and tested for accuracy against the output of the original Process macro
+  2.16 (see `tests/test_models_accuracy.py`). The 42 models that PROCESS 5 still defines are also compared to the
+  output of PROCESS for R 5.0 (see `tests/test_process5.py`), and the `version` argument selects which release's
+  conventions to reproduce (section 1.I).
   * Estimation of binary/continuous outcome variables. The binary outcomes are estimated in Logit using the 
   Newton-Raphson convergence algorithm, the continuous variables are estimated using OLS.
   * All statistics reported by Process: 
@@ -242,11 +243,14 @@ It goes without saying that this will return an error if your DV is not dichotom
 
 ### D. Specifying custom spotlight values for the moderator(s)
 
-In Process as in PyProcessMacro the spotlight values of the moderators are defined as follow:
-* By default, the spotlight values are equal to M - 1SD, M and M + 1SD, where M and SD are the mean and standard 
-deviation of that variable. If the option `quantile=1` is specified, then the spotlight values for each moderator 
-are the 10th, 25th, 50th, 75th and 90th percentile of that variable.
-* If a moderator is a discrete variable, the spotlight values are those discrete values.
+The spotlight values of the moderators depend on the PROCESS version emulated (see section 1.I):
+* Under `version="2.16"` (the default), a continuous moderator is probed at M - 1SD, M and M + 1SD, where M and SD
+are its mean and standard deviation, and a moderator with at most five distinct values is probed at each of them.
+* Under `version="5.0"`, a continuous moderator is probed at its 16th, 50th and 84th percentiles, computed as
+PROCESS does, and a dichotomous moderator at its two values.
+* `quantile=True` probes a continuous moderator at its 10th, 25th, 50th, 75th and 90th percentiles (the `quantile`
+option of PROCESS 2) and `moments=True` at M - 1SD, M and M + 1SD (the `moments` option of PROCESS 5), whatever
+the version.
 
 In Process, custom spotlight values can be applied to each moderator q, v, z, ... through the arguments qmodval, 
 vmodval, zmodval... 
@@ -317,6 +321,34 @@ with `logit=False`.
 p = Process(data=df, model=4, x="Effort", y="Success", m=["MediationSkills"], effsize=True)
 p.indirect_model.effect_size_summary()
 ````
+
+### I. Reproducing the conventions of a PROCESS release
+
+PROCESS 2 and PROCESS 3 to 5 differ in a few defaults that change the numbers in the output. The `version`
+argument selects which release to follow, so that an analysis run with either can be reproduced:
+
+| | `version="2.16"` (default) | `version="5.0"` |
+|---|---|---|
+| Bootstrap confidence intervals | bias-corrected | percentile |
+| Spotlight values of a continuous moderator | mean and one SD either side | 16th, 50th and 84th percentiles |
+| Discrete moderator probed at its values | when it has at most five | when it has two |
+| Conditional effects of Models 1 to 3 | always reported | reported when the interaction's p is at most `intprobe=0.10` |
+| Models accepted | 1 to 76 | 1 to 22, 28, 29, 58 to 73, 75 and 76 |
+
+Any argument passed explicitly wins over the version's default (`percent`, `quantile`, `moments`, `modval`,
+`intprobe`). The initialization banner and the first line of `summary()` state the conventions in force. Models
+23 to 27 and 30 to 57 (third and fourth moderators) and Model 74 do not exist in PROCESS 5, which refuses them;
+PyProcessMacro does the same under `version="5.0"` and keeps estimating them as PROCESS 2.16 defined them under
+`version="2.16"`, so that older results remain reproducible. Mediation models report their conditional direct and
+indirect effects under both versions, as PROCESS does; `intprobe` only concerns the moderation-only models, whose
+conditional effects stay available from `direct_model.coeff_summary()` when they are not printed.
+
+````python
+p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["MediationSkills"], version="5.0")
+p.summary()  # starts with: PROCESS version: 5.0. Bootstrap intervals: percentile. Moderators at the 16th, ...
+````
+
+The 2.16 conventions stay the default throughout the 2.x releases; 3.0 will switch the default to `"5.0"`.
 
 ## 2. Accessing the estimation results
 

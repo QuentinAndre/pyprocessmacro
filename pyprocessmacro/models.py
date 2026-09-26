@@ -1518,6 +1518,11 @@ class DirectEffectModel(object):
             The dictionary mapping each symbol to a variable name.
         :param options: dict
             The options of the model.
+
+        For the moderation-only models (1 to 3), probe_p holds the p-value of the test of the highest-order
+        interaction of X, which PROCESS 3 and later compare to intprobe before reporting the conditional effects,
+        and probe_terms the names of the terms tested (#87). Both are None or empty for mediation models, which
+        always report their conditional direct effects.
         """
         self._model = model
         self._is_logit = isinstance(model, LogitOutcomeModel)
@@ -1533,6 +1538,58 @@ class DirectEffectModel(object):
             options = {}
         self._options = options
         self._estimation_results = self._estimate()
+        if self._has_moderation and not self._has_mediation:
+            self.probe_p, self.probe_terms = self._probe()
+        else:
+            self.probe_p, self.probe_terms = None, []
+
+    def _probe(self):
+        """
+        The p-value PROCESS 3 and later compare to intprobe before reporting the conditional effects of X (#87):
+        the test of the highest-order product term(s) of X with its moderator(s), the smallest p-value when two
+        additive moderators give two terms of that order. OLS: the coefficient's test, which is the F test of the
+        change in R-squared PROCESS prints for a single term under the same covariance estimator. Logit: the
+        likelihood-ratio test of the term, which PROCESS prints for a binary outcome.
+        :return: (p-value, the names of the terms tested)
+        """
+        model = self._model
+        exog = list(model._exogvars)
+        with_x = [t for t in exog if "*" in t and "x" in t.split("*")]
+        if not with_x:
+            return None, []
+        order = max(len(t.split("*")) for t in with_x)
+        terms = [t for t in with_x if len(t.split("*")) == order]
+        pvalues = []
+        for term in terms:
+            if self._is_logit:
+                reduced = LogitOutcomeModel(
+                    model._data, model._endogvar, [t for t in exog if t != term],
+                    model._symb_to_ind, model._symb_to_var, model._options,
+                )
+                chi2 = 2 * (model.estimation_results["llf"] - reduced.estimation_results["llf"])
+                pvalues.append(float(stats.chi2.sf(max(chi2, 0.0), 1)))
+            else:
+                pvalues.append(float(np.asarray(model.estimation_results["p"]).ravel()[exog.index(term)]))
+        return min(pvalues), [self._symb_to_var.get(t, t) for t in terms]
+
+    @property
+    def probed(self):
+        """
+        Whether the conditional effects of X are reported: always for mediation models and unmoderated effects,
+        otherwise when the p-value of the highest-order interaction is at most intprobe (#87).
+        """
+        if self.probe_p is None:
+            return True
+        intprobe = self._options.get("intprobe", 1.0)
+        return intprobe >= 1 or self.probe_p <= intprobe
+
+    def _not_probed_text(self):
+        x, y = self._symb_to_var["x"], self._symb_to_var["y"]
+        return (
+            f"Conditional effect(s) of {x} on {y} are not reported: the highest-order interaction "
+            f"({', '.join(self.probe_terms)}) has p = {self.probe_p:.4f}, above intprobe = "
+            f"{self._options.get('intprobe', 1.0):g}. They remain available from direct_model.coeff_summary().\n"
+        )
 
     def _estimate(self):
         """
@@ -1697,7 +1754,7 @@ class DirectEffectModel(object):
                     y=symb_to_var["y"],
                     coeffs=self.coeff_summary().to_string(float_format=float_format),
                 )
-        else:
+        elif self.probed:
             basestr = (
                 "Conditional effect(s) of {x} on {y} at values of the moderator(s):\n\n"
                 "{coeffs}\n".format(
@@ -1706,6 +1763,8 @@ class DirectEffectModel(object):
                     coeffs=self.coeff_summary().to_string(float_format=float_format),
                 )
             )
+        else:  # PROCESS 3 and later probe only below intprobe (#87)
+            basestr = self._not_probed_text()
         return basestr
 
     def __str__(self):
