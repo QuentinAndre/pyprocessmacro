@@ -53,7 +53,8 @@ def tidy(process, component=None):
     """
     stv = process._symb_to_var
     moderators = sorted(stv[s] for s in process._moderators["all"])  # by variable name
-    columns = ["component", "outcome", "term", "moderator"] + moderators + STAT_COLUMNS + META_COLUMNS
+    x_code = ["x_code"] if getattr(process.direct_model, "_categorical_x", False) else []  # #17
+    columns = ["component", "outcome", "term", "moderator"] + x_code + moderators + STAT_COLUMNS + META_COLUMNS
     conf = process.options["conf"]
     n_boot = process.options["boot"]
     boot_method = "bootstrap_percentile" if process.options["percent"] else "bootstrap_bc"
@@ -63,7 +64,7 @@ def tidy(process, component=None):
     def add(comp, outcome, term, estimate, std_error, conf_low, conf_high, method,
             statistic=np.nan, p_value=np.nan, moderator=None, at=None, boot=False):
         row = {"component": comp, "outcome": outcome, "term": term, "moderator": moderator}
-        row.update({m: np.nan for m in moderators})
+        row.update({m: np.nan for m in moderators + x_code})
         if at:
             row.update(at)
         row.update(
@@ -81,20 +82,36 @@ def tidy(process, component=None):
             add("outcome", outcome, term, res["betas"][i], res["se"][i], res["llci"][i], res["ulci"][i],
                 _estimator(res), statistic[i], res["p"][i])
 
-    # Direct (or, for models 1 to 3, conditional) effects of X on Y.
+    # Direct (or, for models 1 to 3, conditional) effects of X on Y; one row per code of a multicategorical X,
+    # named by the code (#17).
     direct = process.direct_model
     res = direct._estimation_results
     direct_mods = [stv[s] for s in direct._moderators_symb]
-    for i, combo in enumerate(product(*direct._moderators_values)):
-        add("direct", dv, stv["x"], res["betas"][i], res["se"][i], res["llci"][i], res["ulci"][i],
-            _estimator(direct._model.estimation_results), res["t"][i], res["p"][i],
-            at=dict(zip(direct_mods, combo)))
+    combos = list(product(*direct._moderators_values))
+    i = 0
+    for label in direct._x_labels:
+        for combo in combos:
+            add("direct", dv, label, res["betas"][i], res["se"][i], res["llci"][i], res["ulci"][i],
+                _estimator(direct._model.estimation_results), res["t"][i], res["p"][i],
+                at=dict(zip(direct_mods, combo)))
+            i += 1
 
     if not process.has_mediation:
         return _finish(rows, columns, component)
 
-    indirect = process.indirect_model
-    mediators = [stv[f"m{i + 1}"] for i in range(indirect._n_meds)]
+    # With a multicategorical X, every indirect row is repeated per code, labelled by the code in `x_code` (#17).
+    parent = process.indirect_model
+    mediators = [stv[f"m{i + 1}"] for i in range(parent._n_meds)]
+    for indirect, x_label in zip(parent._views(), parent._x_labels):
+        _indirect_rows(indirect, add, dv, mediators, stv, boot_method, process.options,
+                       x_label if parent._categorical_x else None)
+
+    return _finish(rows, columns, component)
+
+
+def _indirect_rows(indirect, add, dv, mediators, stv, boot_method, options, x_code):
+    """Rows of the indirect effects, the standardized effects and the indices of one (code-)view."""
+    extra = {"x_code": x_code} if x_code is not None else {}
     res = indirect.estimation_results
     if indirect._has_moderation:
         ind_mods = [stv[s] for s in indirect._moderators_symb]
@@ -103,20 +120,22 @@ def tidy(process, component=None):
         for med in mediators:
             for combo in combos:
                 add("indirect", dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
-                    boot_method, at=dict(zip(ind_mods, combo)), boot=True)
+                    boot_method, at={**dict(zip(ind_mods, combo)), **extra}, boot=True)
                 k += 1
     else:  # parallel mediators or the serial paths of model 6, labelled by the model
         for k, (comp, term) in enumerate(indirect.effect_labels):
             add(comp, dv, term, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
-                boot_method, boot=True)
+                boot_method, at=extra or None, boot=True)
 
-    if process.options.get("effsize"):
+    if options.get("effsize"):
         sizes = indirect.effect_sizes()
         for kind, comp in (("ps", "indirect_ps"), ("cs", "indirect_cs")):
+            if kind not in sizes:
+                continue
             rows_k = sizes[kind]
             for k, term in enumerate(rows_k["labels"]):
                 add(comp, dv, term, rows_k["effect"][k], rows_k["se"][k], rows_k["llci"][k], rows_k["ulci"][k],
-                    boot_method, boot=True)
+                    boot_method, at=extra or None, boot=True)
 
     # Indices of moderated mediation, in the layouts of the corresponding index methods.
     mod_symbols = list(indirect._moderators_symb)
@@ -125,20 +144,23 @@ def tidy(process, component=None):
         res = getattr(indirect, f"_{code}_index")()
         comp = f"index_{code.lower()}"
         if code == "MM":
-            for i, med in enumerate(mediators):
-                add(comp, dv, med, res["effect"][i], res["se"][i], res["llci"][i], res["ulci"][i],
-                    boot_method, moderator=mod_names[0], boot=True)
+            k = 0
+            for mod_label in indirect.mm_moderator_labels():
+                for med in mediators:
+                    add(comp, dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
+                        boot_method, moderator=mod_label, at=extra or None, boot=True)
+                    k += 1
         elif code == "PMM":
             k = 0
             for name in mod_names:
                 for med in mediators:
                     add(comp, dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
-                        boot_method, moderator=name, boot=True)
+                        boot_method, moderator=name, at=extra or None, boot=True)
                     k += 1
         elif code == "MMM":
             for i, med in enumerate(mediators):
                 add(comp, dv, med, res["effect"][i], res["se"][i], res["llci"][i], res["ulci"][i],
-                    boot_method, boot=True)
+                    boot_method, at=extra or None, boot=True)
         elif code == "CMM":
             mod1, mod2 = mod_names
             values1, values2 = indirect._moderators_values
@@ -146,15 +168,13 @@ def tidy(process, component=None):
             for med in mediators:
                 for value in values1:  # index of moderated mediation by mod2, conditional on mod1
                     add(comp, dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
-                        boot_method, moderator=mod2, at={mod1: value}, boot=True)
+                        boot_method, moderator=mod2, at={mod1: value, **extra}, boot=True)
                     k += 1
             for med in mediators:
                 for value in values2:  # index of moderated mediation by mod1, conditional on mod2
                     add(comp, dv, med, res["effect"][k], res["se"][k], res["llci"][k], res["ulci"][k],
-                        boot_method, moderator=mod1, at={mod2: value}, boot=True)
+                        boot_method, moderator=mod1, at={mod2: value, **extra}, boot=True)
                     k += 1
-
-    return _finish(rows, columns, component)
 
 
 def _estimator(res):

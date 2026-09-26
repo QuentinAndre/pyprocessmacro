@@ -34,6 +34,8 @@ def standardized_effects(model):
     sd_x, sd_y = model._data[:, ind_x].std(ddof=1), model._data[:, ind_y].std(ddof=1)
     boot_sd_x, boot_sd_y = model._boot_sds[:, 0], model._boot_sds[:, 1]
     scales = {"ps": (1 / sd_y, 1 / boot_sd_y), "cs": (sd_x / sd_y, boot_sd_x / boot_sd_y)}
+    if getattr(model, "_x_symb", "x") != "x":  # a code of a multicategorical X: no completely standardized effect (#17)
+        scales.pop("cs")
     conf = model._options["conf"]
     interval = percentile_ci if model._options["percent"] else None
     out = {}
@@ -54,7 +56,7 @@ def effect_size_table(model):
     """One table with a Standardization column: partial rows first, then complete rows."""
     results = standardized_effects(model)
     levels, stats = [], []
-    for kind in ("ps", "cs"):
+    for kind in [k for k in ("ps", "cs") if k in results]:
         rows = results[kind]
         for i, label in enumerate(rows["labels"]):
             levels.append([_display(label), KINDS[kind].split()[0].lower()])
@@ -67,7 +69,7 @@ def effect_size_text(model, float_format):
     stv = model._symb_to_var
     results = standardized_effects(model)
     text = ""
-    for kind in ("ps", "cs"):
+    for kind in [k for k in ("ps", "cs") if k in results]:
         rows = results[kind]
         stats = np.array([rows["effect"], rows["se"], rows["llci"], rows["ulci"]]).T
         table = _summary_table([[_display(label)] for label in rows["labels"]], [""], stats, TABLE_COLUMNS)

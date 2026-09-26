@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .serial import SerialMediationModel
-from . import negbin
+from . import categorical, negbin
 from .models import (
     OLSOutcomeModel,
     DirectEffectModel,
@@ -47,6 +47,11 @@ class Process(object):
         "precision",
         "logit",
         "family",
+        "mcx",
+        "mcw",
+        "mcz",
+        "mcv",
+        "mcq",
         "modval",
         "controls",
         "spotlight",
@@ -607,6 +612,11 @@ class Process(object):
             spotlight=None,
             intprobe=1.0,
             family=None,
+            mcx=None,
+            mcw=None,
+            mcz=None,
+            mcv=None,
+            mcq=None,
             **kwargs,
     ):
         """
@@ -688,6 +698,23 @@ class Process(object):
             extension that PROCESS does not offer: the b path is then on the log-count scale and the indirect
             effect a*b mixes an OLS coefficient with it, as PROCESS's logistic case does. The mediator
             equations stay OLS. The dispersion alpha is reported in the model summary.
+        :param mcx: None, 1 to 4, or "indicator", "sequential", "helmert", "effect"
+            Declares X as multicategorical (three to nine groups) and names the coding system, as PROCESS's mcx
+            option (#17): indicator (dummy) coding against the group with the smallest value, sequential coding,
+            Helmert coding or effect coding. X is then represented by g - 1 codes X1, X2, ... whose mapping to the
+            groups is printed at the top of the output, and every effect of X is reported per code ("relative"
+            direct, conditional and indirect effects), with an omnibus test of the direct effect. The values of X
+            may be numbers, strings or a pandas Categorical; groups are ordered by their sorted values.
+        :param mcw: None, 1 to 4, or a coding name
+            Declares the moderator W as multicategorical, as PROCESS's mcw option (#17). For models 1 to 3 this is
+            the moderator passed as m. The conditional effects are then reported in each group of W, and the
+            index of moderated mediation per code of W. The indices of partial, moderated moderated and
+            conditional moderated mediation, the floodlight analysis and the plots are not available with a
+            multicategorical variable.
+        :param mcz, mcv, mcq: None, 1 to 4, or a coding name
+            The same for the moderators Z (the moderator passed as w in models 2 and 3), V and Q of the 2.16
+            numbering; PROCESS 3 and later call the second moderator of a model Z and, in models such as 14 and
+            15, the moderator W where PyProcessMacro says v.
         :param iterate: int
             The maximum number of iterations for the Newton-Raphson algorithm of the logistic regression.
         :param convergence: float
@@ -819,6 +846,11 @@ class Process(object):
 
         self._moderators = gen_moderators(raw_equations, raw_varlist)
 
+        # Multicategorical X and W (#17): the codes replace the variable in every equation.
+        self.categorical = self._gen_codings(var_kwargs)
+        self._x_symbs = self.categorical["x"].symbols if "x" in self.categorical else ["x"]
+        self._x_labels = self.categorical["x"].labels if "x" in self.categorical else [self._symb_to_var["x"]]
+
         if self.options["effsize"]:
             if not self.has_mediation:
                 raise ValueError("The option 'effsize' standardizes indirect effects; Model "
@@ -833,6 +865,9 @@ class Process(object):
         self._equations = self._gen_equations(
             raw_equations["all_to_y"], raw_equations["x_to_m"], controls_in=controls_in
         )
+        self._equations = [
+            (endog, categorical.expand_terms(terms, self.categorical)) for endog, terms in self._equations
+        ]
 
         # Prepare the data: drop NaN, rename the columns, add a constant, and mean-center moderators if needed.
         self._data, self.n_obs, self.n_obs_null, self.centered_vars = (
@@ -849,6 +884,9 @@ class Process(object):
         self._check_moderator_names(modval, "modval")
         modval_symb = {self._var_to_symb[k]: v for k, v in modval.items()}
         self._spotlight_values = self._gen_spotlight_values(modval_symb)
+        self._mod_codes = {
+            mod: self.categorical[mod].level_codes() for mod in self._moderators["all"] if mod in self.categorical
+        }
 
         # Generate the direct model.
         self.direct_model = self._gen_direct_effect_model()
@@ -933,6 +971,15 @@ class Process(object):
             errstr += "The option 'family' must be one of 'ols', 'logit' or 'negbin'.\n"
         elif options["logit"] is True and family not in (None, "logit"):
             errstr += "The options 'logit' and 'family' disagree; use one or the other.\n"
+        for option in ("mcx", "mcw", "mcz", "mcv", "mcq"):
+            try:
+                options[option] = categorical.scheme_name(options[option], option)
+            except ValueError as error:
+                errstr += f"{error}\n"
+        if options.get("mcx") and options["contrast"] is True:
+            errstr += "The option 'contrast' is not available with a multicategorical X, as in PROCESS.\n"
+        if options.get("mcx") and self.model_num == 74:
+            errstr += "Model 74, where X moderates its own indirect effect, does not take a multicategorical X.\n"
         if options["controls_in"] not in ["all", "x_to_m", "all_to_y"]:
             errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
@@ -977,6 +1024,44 @@ class Process(object):
             f"Note: Model {self.model_num} was retired in PROCESS {release} and does not exist in PROCESS 5 "
             f"({reason}); PyProcessMacro estimates it as PROCESS 2.16 defined it."
         )
+
+    def _gen_codings(self, var_kwargs):
+        """
+        The Coding of each multicategorical variable (#17), keyed by its symbol: "x" for mcx, and for mcw the
+        moderator W, which is the symbol "m" in models 1 to 3 and "w" elsewhere. Levels come from the analysis
+        rows (after listwise deletion), as in PROCESS.
+        """
+        codings = {}
+        subset = self._data[self.varlist].dropna()
+        moderation_only = self.model_num <= 3
+        requests = (
+            ("x", "X", "mcx"),
+            ("m" if moderation_only else "w", "W", "mcw"),
+            ("w" if moderation_only else "z", "Z", "mcz"),
+            ("v", "V", "mcv"),
+            ("q", "Q", "mcq"),
+        )
+        for symb, letter, option in requests:
+            scheme = self.options.get(option)
+            if scheme is None:
+                continue
+            if symb not in var_kwargs:
+                raise ValueError(
+                    f"The option '{option}' declares a moderator {letter} that Model {self.model_num} does not have."
+                )
+            name = var_kwargs[symb][0]
+            codings[symb] = categorical.Coding(name, subset[name].to_numpy(), scheme, letter, symb)
+        return codings
+
+    def _codings_text(self):
+        """The category-to-code tables of the multicategorical variables, as PROCESS prints them (#17)."""
+        text = ""
+        for coding in self.categorical.values():
+            text += (
+                f"\nCoding of the multicategorical {coding.letter} variable {coding.name} ({coding.scheme} coding):\n"
+                f"{coding.table().to_string()}\n"
+            )
+        return text
 
     def _gen_valid_varlist(self, var_kwargs):
         """
@@ -1140,6 +1225,15 @@ class Process(object):
         # Adding a constant to the data.
         data["Cons"] = 1
 
+        # The codes of the multicategorical variables (#17); the variable itself stays as a numeric column.
+        for symb, coding in self.categorical.items():
+            codes = coding.codes_for(data[symb].to_numpy())
+            for j, code_symb in enumerate(coding.symbols):
+                data[code_symb] = codes[:, j]
+                self._symb_to_var[code_symb] = coding.labels[j]
+                self._var_to_symb[coding.labels[j]] = code_symb
+            data[symb] = coding.numeric(data[symb].to_numpy())
+
         if self.options["logit"]:
             endog = data["y"]
             uniques = np.unique(endog)
@@ -1164,6 +1258,7 @@ class Process(object):
                 )
             if mod_x:
                 centered_vars += list(mod_x) + ["x"]
+            centered_vars = [v for v in centered_vars if v not in self.categorical]  # codes are never centered
             data.loc[:, centered_vars] = data.loc[:, centered_vars].subtract(
                 data.loc[:, centered_vars].mean()
             )
@@ -1257,6 +1352,17 @@ class Process(object):
         data = self._data.values
         rule = self.options["spotlight"]
         for mod in self._moderators["all"]:
+            if mod in self.categorical:  # a multicategorical moderator is probed in each of its groups (#17)
+                levels = list(self.categorical[mod].levels)
+                custom = list(modval_symb.get(mod, []))
+                unknown = [v for v in custom if v not in levels]
+                if unknown:
+                    raise ValueError(
+                        f"The values {unknown} in 'modval' are not groups of the multicategorical moderator "
+                        f"{self.categorical[mod].name} (groups: {levels})."
+                    )
+                spot_values[mod] = custom or levels
+                continue
             index = self._symb_to_ind[mod]
             val = data[:, index]
             spotvals = modval_symb.get(mod, [])
@@ -1291,6 +1397,9 @@ class Process(object):
             self.has_mediation,
             self._symb_to_var,
             self.options,
+            x_symbs=self._x_symbs,
+            x_labels=self._x_labels,
+            mod_codes=self._mod_codes,
         )
         return dem
 
@@ -1302,7 +1411,8 @@ class Process(object):
         data_array = self._data.values
         if self.model_num == 6:
             return SerialMediationModel(
-                data_array, self._equations, self.n_meds, self._symb_to_ind, self._symb_to_var, self.options
+                data_array, self._equations, self.n_meds, self._symb_to_ind, self._symb_to_var, self.options,
+                x_symbs=self._x_symbs, x_labels=self._x_labels, mod_codes=self._mod_codes,
             )
         y_exogvars = self._equations[0][1]
         m_exogvars = self._equations[1][1]
@@ -1320,6 +1430,9 @@ class Process(object):
             self._symb_to_ind,
             self._symb_to_var,
             self.options,
+            x_symbs=self._x_symbs,
+            x_labels=self._x_labels,
+            mod_codes=self._mod_codes,
         )
         return iem
 
@@ -1336,16 +1449,15 @@ class Process(object):
             f"{self._conventions_text()}\n\n"
             "Variables:"
         )
+        code_symbols = {s for coding in self.categorical.values() for s in coding.symbols}
         parameters = [
             (symb, name)
             for (symb, name) in self._symb_to_var.items()
-            if "*" not in symb and "c" not in symb
+            if "*" not in symb and "c" not in symb and symb not in code_symbols
         ]
         for symb, name in parameters:
-            if "*" in symb or "c" in symb:
-                pass
-            else:
-                initstr += f"\n    {symb} = {name}"
+            initstr += f"\n    {symb} = {name}"
+        initstr += self._codings_text()
         controls = [name for (symb, name) in self._symb_to_var.items() if "c" in symb]
         if controls:
             initstr += f"\nStatistical Controls:\n {', '.join(controls)}\n\n"
@@ -1407,6 +1519,15 @@ class Process(object):
         if n_mods_ind == 1:  # One single moderator, moderated mediation analysis
             return ["MM"]
         elif n_mods_ind == 2:
+            categorical_mods = [self._symb_to_var[m] for m in self._moderators["indirect"] if m in self.categorical]
+            if categorical_mods:  # the two-moderator indices are not implemented for multicategorical moderators (#17)
+                warnings.warn(
+                    "The indices of partial, moderated moderated and conditional moderated mediation are not "
+                    f"available with a multicategorical moderator ({', '.join(categorical_mods)}); none is reported.",
+                    UserWarning,
+                    stacklevel=4,
+                )
+                return []
             if (n_mods_m == 1) or threeway:  # Moderators on two different paths
                 return ["MMM", "CMM"]
             else:
@@ -1436,6 +1557,8 @@ class Process(object):
         x_symb = self._var_to_symb[x]
         x_values = modval_symb.get(x_symb)
 
+        if x_values is None and x_symb in self.categorical:  # a multicategorical moderator: its groups (#17)
+            x_values = list(self.categorical[x_symb].levels)
         if x_values is None:
             xdata = self._data[x_symb]
             if len(np.unique(xdata)) == 2:
@@ -1571,7 +1694,7 @@ class Process(object):
 
     def _summary_text(self):
         with pd.option_context("display.precision", self.options["precision"]):
-            parts = [self._conventions_text() + "\n"]
+            parts = [self._conventions_text() + "\n" + self._codings_text()]
             full_model = self.outcome_models[self.iv]
             m_models = [
                 self.outcome_models.get(med_name) for med_name in self.mediators
@@ -1716,6 +1839,10 @@ class Process(object):
         :return: IndirectFloodlightAnalysis
             An IndirectFloodlightAnalysis object
         """
+        if self.categorical:
+            raise NotImplementedError(
+                "The floodlight analysis is not available with a multicategorical X or moderator (#17)."
+            )
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -1786,6 +1913,10 @@ class Process(object):
         :return: DirectFloodlightAnalysis
             A DirectFloodlightAnalysis object
         """
+        if self.categorical:
+            raise NotImplementedError(
+                "The floodlight analysis is not available with a multicategorical X or moderator (#17)."
+            )
         mod_symb = self._var_to_symb.get(mod_name)
         if not mod_symb:
             raise ValueError(f"The variable {mod_name} is not a variable in the model.")
@@ -1870,16 +2001,16 @@ class Process(object):
                     spotval_symb[mod_symb] = mod_val
 
         names, v = zip(*spotval_symb.items())
-        values = np.array([i for i in product(*v)])
-        effect, _, se, llci, ulci = self.indirect_model._get_conditional_indirect_effects(
-            med_index, names, values
-        )
-
-        rows = np.array([effect, se, llci, ulci]).T
-
-        df1 = pd.DataFrame(rows, columns=["Effect", "Boot SE", "LLCI", "ULCI"])
-        df2 = pd.DataFrame(values, columns=names)
-        df = df1.join(df2, how="outer")
+        values = [list(i) for i in product(*v)]
+        frames = []
+        for view, label in zip(self.indirect_model._views(), self._x_labels):  # per code of a multicategorical X
+            effect, _, se, llci, ulci = view._get_conditional_indirect_effects(med_index, names, values)
+            frame = pd.DataFrame(np.array([effect, se, llci, ulci]).T, columns=["Effect", "Boot SE", "LLCI", "ULCI"])
+            frame = frame.join(pd.DataFrame(values, columns=names), how="outer")
+            if len(self._x_symbs) > 1:
+                frame.insert(0, "X", label)
+            frames.append(frame)
+        df = pd.concat(frames, ignore_index=True)
 
         stv = self._symb_to_var
         df.rename(columns=lambda c: stv.get(c, c), inplace=True)
@@ -1912,17 +2043,16 @@ class Process(object):
                     spotval_symb[mod_symb] = mod_val
 
         names, v = zip(*spotval_symb.items())
-        values = np.array([i for i in product(*v)])
-
-        effect, se, llci, ulci = self.direct_model._get_conditional_direct_effects(
-            names, values
-        )
-
-        rows = np.array([effect, se, llci, ulci]).T
-
-        df1 = pd.DataFrame(rows, columns=["Effect", "SE", "LLCI", "ULCI"])
-        df2 = pd.DataFrame(values, columns=names)
-        df = df1.join(df2, how="outer")
+        values = [list(i) for i in product(*v)]
+        frames = []
+        for xs, label in zip(self._x_symbs, self._x_labels):  # one block per code of a multicategorical X (#17)
+            effect, se, llci, ulci = self.direct_model._get_conditional_direct_effects(names, values, xs)
+            frame = pd.DataFrame(np.array([effect, se, llci, ulci]).T, columns=["Effect", "SE", "LLCI", "ULCI"])
+            frame = frame.join(pd.DataFrame(values, columns=names), how="outer")
+            if len(self._x_symbs) > 1:
+                frame.insert(0, "X", label)
+            frames.append(frame)
+        df = pd.concat(frames, ignore_index=True)
 
         stv = self._symb_to_var
         df.rename(columns=lambda c: stv.get(c, c), inplace=True)
@@ -1989,6 +2119,8 @@ class Process(object):
 
         if not x:
             raise ValueError("You must specify at least one moderator for 'x'")
+        if "x" in self.categorical:
+            raise NotImplementedError("The conditional-effect plots are not available with a multicategorical X (#17).")
         if modval is None:
             modval = {}
 
@@ -2072,6 +2204,8 @@ class Process(object):
         """
         if not x:
             raise ValueError("You must specify at least one moderator for 'x'")
+        if "x" in self.categorical:
+            raise NotImplementedError("The conditional-effect plots are not available with a multicategorical X (#17).")
         if modval is None:
             modval = {}
 

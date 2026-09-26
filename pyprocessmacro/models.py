@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import warnings
 from functools import partial
 from itertools import product, combinations
@@ -11,6 +12,7 @@ from numpy.linalg import inv, LinAlgError
 
 from . import negbin
 from .bootstrap import BootstrapSpec, bootstrap_parameters, family_of
+from .categorical import code_symbols, mod_dict as _mod_dict
 from .utils import (
     fast_OLS,
     fast_optimize,
@@ -23,6 +25,18 @@ from .utils import (
     find_significance_region,
     ConvergenceError,
 )
+
+
+def _with_code_column(frames, labels):
+    """Concatenate one table per X code, with the code label in a first column "X" (#17)."""
+    out = []
+    for label, frame in zip(labels, frames):
+        frame = frame.copy()
+        frame.insert(0, "X", label)
+        out.append(frame)
+    table = pd.concat(out)
+    table.index = [""] * len(table)
+    return table
 
 
 def _summary_table(levels, level_columns, stats, stat_columns):
@@ -682,6 +696,9 @@ class ParallelMediationModel(object):
             symb_to_ind,
             symb_to_var,
             options=None,
+            x_symbs=("x",),
+            x_labels=None,
+            mod_codes=None,
     ):
         """
         :param data: array
@@ -704,6 +721,9 @@ class ParallelMediationModel(object):
             Dictionary mapping the symbols to the actual names of the variable in the data
         :param options: dict
             Dictionary of options, from the Process object
+        :param x_symbs: the symbols of X: ("x",) or the codes of a multicategorical X (#17)
+        :param x_labels: the labels of the codes (X1, X2, ...) when X is multicategorical
+        :param mod_codes: {moderator symbol: {level: {code symbol: value}}} for multicategorical moderators
         """
         self._data = data
         self._exog_terms_y = exog_terms_y
@@ -715,6 +735,12 @@ class ParallelMediationModel(object):
         if not options:
             options = {}
         self._options = options
+        self._x_symbs = list(x_symbs)
+        self._x_symb = self._x_symbs[0]
+        self._x_labels = list(x_labels) if x_labels else [symb_to_var.get("x", "x")]
+        self._categorical_x = len(self._x_symbs) > 1
+        self._mod_codes = mod_codes or {}
+        self._code_views = None
 
         self._vars_y = [
             i for i in self._exog_terms_y if (("*" not in i) & (i != "Cons"))
@@ -751,7 +777,8 @@ class ParallelMediationModel(object):
             self._estimate_bootstrapped_params()
         )
 
-        self._base_derivs = self._gen_derivatives()
+        self._base_derivs_by_x = {xs: self._gen_derivatives(xs) for xs in self._x_symbs}
+        self._base_derivs = self._base_derivs_by_x[self._x_symb]
 
         self._moderators_symb = mod_symb
         self._moderators_values = [
@@ -810,10 +837,11 @@ class ParallelMediationModel(object):
         )
         return boot_betas_y, boot_betas_m, n_fail_samples
 
-    def _gen_derivatives(self):
+    def _gen_derivatives(self, x_symb="x"):
         """
         Generate the list of symbolic derivatives for the indirect path(s) from X to Y. The derivative of the path from
-        X to M is taken with respect to X, and the derivative of the path to Y is taken with respect to M.
+        X to M is taken with respect to X (or to one code of a multicategorical X), and the derivative of the path
+        to Y is taken with respect to M.
 
         For instance (Model 21), we consider the equation of x_to_m:
             * The equation of x_to_m is: aConstant + bX + cW + dX*W. Rearranging for X: 1*(aConstant + cW) + X*(b + dW).
@@ -850,10 +878,10 @@ class ParallelMediationModel(object):
         exog_terms_m = self._exog_terms_m
         x_to_m = np.empty((len(vars_m), len(exog_terms_m)), dtype="object")
         for j, var in enumerate(vars_m):
-            if var == "x":
-                x_to_m[j] = [1 if var in term else 0 for term in exog_terms_m]
+            if var == x_symb:
+                x_to_m[j] = [1 if var in term.split("*") else 0 for term in exog_terms_m]
             else:
-                x_to_m[j] = [var if var in term else 1 for term in exog_terms_m]
+                x_to_m[j] = [var if var in term.split("*") else 1 for term in exog_terms_m]
         derivs["x_to_m"] = x_to_m.T
 
         list_m_to_y = []
@@ -864,9 +892,9 @@ class ParallelMediationModel(object):
             m_to_y = np.empty((len(vars_y), len(exog_terms_y)), dtype="object")
             for j, var in enumerate(vars_y):
                 if var == "m{}".format(i + 1):
-                    m_to_y[j] = [1 if var in term else 0 for term in exog_terms_y]
+                    m_to_y[j] = [1 if var in term.split("*") else 0 for term in exog_terms_y]
                 else:
-                    m_to_y[j] = [var if var in term else 1 for term in exog_terms_y]
+                    m_to_y[j] = [var if var in term.split("*") else 1 for term in exog_terms_y]
             list_m_to_y.append(m_to_y.T)
 
         derivs["m_to_y"] = list_m_to_y
@@ -935,7 +963,7 @@ class ParallelMediationModel(object):
         be = np.empty((n_comb, n_boots))
 
         for i, vals in enumerate(mod_values):
-            mod_dict = {k: v for k, v in zip(mod_symb, vals)}
+            mod_dict = _mod_dict(mod_symb, vals, self._mod_codes)
             e[i], be[i], se[i], llci[i], ulci[i] = self._indirect_effect_at(
                 med_index, mod_dict
             )
@@ -1040,37 +1068,29 @@ class ParallelMediationModel(object):
             )
 
         conf = self._options["conf"]
-        n_boots = self._options["boot"]
         (mod,) = self._moderators_symb  # Only one moderator
 
-        # noinspection PyTypeChecker
-        dict_baseline = dict([[mod, 0]])  # Only moderator at 0
-        e_baseline, be_baseline = (
-            np.empty(self._n_meds),
-            np.empty((self._n_meds, n_boots)),
-        )
+        # A unit increase of the moderator; for a multicategorical moderator, one code at a time (#17): the
+        # index is then the difference between the conditional indirect effects the code defines.
+        if mod in self._mod_codes:
+            codes = code_symbols(self._mod_codes, mod)
+            steps = [({c: 0.0 for c in codes}, {c: float(c == on) for c in codes}) for on in codes]
+        else:
+            steps = [({mod: 0}, {mod: 1})]
 
-        # noinspection PyTypeChecker
-        dict_effect = dict([[mod, 1]])  # Only moderator at 1
-        e_effect, be_effect = np.empty(self._n_meds), np.empty((self._n_meds, n_boots))
-
-        effects, se, llci, ulci = np.empty((4, self._n_meds))
-
-        for i in range(self._n_meds):  # ... For all the mediators
-            e_baseline[i], be_baseline[i], *_ = self._indirect_effect_at(
-                i, dict_baseline
-            )
-            e_effect[i], be_effect[i], *_ = self._indirect_effect_at(i, dict_effect)
-
-            e_mm = e_effect[i] - e_baseline[i]  # Moderator at 1 vs. Moderator at 0
-            be_mm = be_effect[i] - be_baseline[i]
-
-            effects[i] = e_mm
-            se[i] = be_mm.std(ddof=1)
-            if self._options["percent"]:
-                llci[i], ulci[i] = percentile_ci(be_mm, conf)
-            else:
-                llci[i], ulci[i] = bias_corrected_ci(e_mm, be_mm, conf)
+        effects, se, llci, ulci = np.empty((4, len(steps), self._n_meds))
+        for s, (dict_baseline, dict_effect) in enumerate(steps):
+            for i in range(self._n_meds):  # ... For all the mediators
+                e_baseline, be_baseline, *_ = self._indirect_effect_at(i, dict_baseline)
+                e_effect, be_effect, *_ = self._indirect_effect_at(i, dict_effect)
+                e_mm = e_effect - e_baseline  # Moderator at 1 vs. Moderator at 0
+                be_mm = be_effect - be_baseline
+                effects[s, i] = e_mm
+                se[s, i] = be_mm.std(ddof=1)
+                if self._options["percent"]:
+                    llci[s, i], ulci[s, i] = percentile_ci(be_mm, conf)
+                else:
+                    llci[s, i], ulci[s, i] = bias_corrected_ci(e_mm, be_mm, conf)
 
         statistics = [i.flatten() for i in [effects, se, llci, ulci]]
 
@@ -1083,6 +1103,7 @@ class ParallelMediationModel(object):
         It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
         moderator on the indirect effect), conditional on a value of zero for the other moderator.
         """
+        self._refuse_categorical_moderators("partial moderated mediation")
         if "PMM" not in self._analysis_list:
             raise ValueError(
                 "This model does not report the Index for Partial Moderated Mediation."
@@ -1149,6 +1170,7 @@ class ParallelMediationModel(object):
         It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
         moderator on the indirect effect) on the marginal impact of the other moderator.
         """
+        self._refuse_categorical_moderators("moderated moderated mediation")
         if "MMM" not in self._analysis_list:
             raise ValueError(
                 "This model does not report the Index for Moderated Moderated Mediation."
@@ -1240,6 +1262,7 @@ class ParallelMediationModel(object):
         It represents the marginal impact of one moderator (i.e. the impact of an increase in one unit for this
         moderator on the indirect effect) at various levels of the other moderator.
         """
+        self._refuse_categorical_moderators("conditional moderated mediation")
         if "CMM" not in self._analysis_list:
             raise ValueError(
                 "This model does not report the Index for Conditional Moderated Mediation."
@@ -1382,7 +1405,7 @@ class ParallelMediationModel(object):
         ).T
         cols_stats = ["Index", "Boot SE", "LLCI", "ULCI"]
 
-        mod_names = [[symb_to_var.get(i, i) for i in self._moderators_symb]]
+        mod_names = [self.mm_moderator_labels()]
         med_names = [
             [
                 symb_to_var.get("m{}".format(i + 1), "m{}".format(i + 1))
@@ -1390,6 +1413,20 @@ class ParallelMediationModel(object):
             ]
         ]
         return _summary_table(product(*(mod_names + med_names)), ["Moderator", "Mediator"], rows_stats, cols_stats)
+
+    def mm_moderator_labels(self):
+        """The rows of the index of moderated mediation: the moderator, or each code of a categorical one (#17)."""
+        (mod,) = self._moderators_symb
+        if mod in self._mod_codes:
+            return [self._symb_to_var.get(c, c) for c in code_symbols(self._mod_codes, mod)]
+        return [self._symb_to_var.get(mod, mod)]
+
+    def _refuse_categorical_moderators(self, what):
+        categorical = [self._symb_to_var.get(m, m) for m in self._moderators_symb if m in self._mod_codes]
+        if categorical:
+            raise NotImplementedError(
+                f"The index of {what} is not available with a multicategorical moderator ({', '.join(categorical)})."
+            )
 
     def _PMM_index_wrapper(self):
         """
@@ -1467,7 +1504,11 @@ class ParallelMediationModel(object):
         ]
         return _summary_table(product(*med_names), ["Mediator"], rows_stats, cols_stats)
 
-    def MM_index_summary(self):
+    def MM_index_summary(self):  # noqa: N802 (PROCESS names)
+        """The index of moderated mediation; per code of a multicategorical X (#17)."""
+        return self._per_code(lambda m: m._MM_index_summary_single())
+
+    def _MM_index_summary_single(self):
         if "MM" in self._analysis_list:
             return self._MM_index_wrapper()
         else:
@@ -1475,7 +1516,10 @@ class ParallelMediationModel(object):
                 "This model does not report the Moderated Mediation index."
             )
 
-    def MMM_index_summary(self):
+    def MMM_index_summary(self):  # noqa: N802
+        return self._per_code(lambda m: m._MMM_index_summary_single())
+
+    def _MMM_index_summary_single(self):
         if "MMM" in self._analysis_list:
             return self._MMM_index_wrapper()
         else:
@@ -1483,7 +1527,10 @@ class ParallelMediationModel(object):
                 "This model does not report the Moderated Moderated Mediation index."
             )
 
-    def PMM_index_summary(self):
+    def PMM_index_summary(self):  # noqa: N802
+        return self._per_code(lambda m: m._PMM_index_summary_single())
+
+    def _PMM_index_summary_single(self):
         if "PMM" in self._analysis_list:
             return self._PMM_index_wrapper()
         else:
@@ -1491,7 +1538,10 @@ class ParallelMediationModel(object):
                 "This model does not report the Partial Moderated Mediation index."
             )
 
-    def CMM_index_summary(self):
+    def CMM_index_summary(self):  # noqa: N802
+        return self._per_code(lambda m: m._CMM_index_summary_single())
+
+    def _CMM_index_summary_single(self):
         if "CMM" in self._analysis_list:
             return self._CMM_index_wrapper()
         else:
@@ -1521,7 +1571,7 @@ class ParallelMediationModel(object):
         """The standardized indirect effects as one table with a Standardization column (#70)."""
         from . import effsize as _effsize
 
-        return _effsize.effect_size_table(self)
+        return self._per_code(_effsize.effect_size_table)
 
     @property
     def effect_labels(self):
@@ -1535,15 +1585,41 @@ class ParallelMediationModel(object):
             labels += [("contrast", f"{a} vs. {b}") for a, b in combinations(mediators, 2)]
         return labels
 
+    def _views(self):
+        """
+        One model per code of a multicategorical X, sharing the estimates and the bootstrap draws and
+        differing in the derivative with respect to X (#17); [self] when X is continuous.
+        """
+        if not self._categorical_x:
+            return [self]
+        if self._code_views is None:
+            views = []
+            for xs, label in zip(self._x_symbs, self._x_labels):
+                view = copy.copy(self)
+                view._x_symbs, view._x_symb, view._x_labels = [xs], xs, [label]
+                view._categorical_x, view._code_views = False, None
+                view._base_derivs = self._base_derivs_by_x[xs]
+                view.estimation_results = (
+                    view._cond_ind_effects() if view._has_moderation else view._simple_ind_effects()
+                )
+                views.append(view)
+            self._code_views = views
+        return self._code_views
+
+    def _per_code(self, method):
+        """A table from `method` for X, or the concatenation over the codes of a multicategorical X."""
+        if not self._categorical_x:
+            return method(self)
+        return _with_code_column([method(view) for view in self._views()], self._x_labels)
+
     def coeff_summary(self):
         """
-        Get the summary of the indirect effect(s).
+        Get the summary of the indirect effect(s); one block per code, labelled in a first column "X", when X
+        is multicategorical (#17).
         :return: The appropriate moderated/unmoderated effect(s).
         """
-        return (
-            self._cond_ind_effects_wrapper()
-            if self._has_moderation
-            else self._simple_ind_effects_wrapper()
+        return self._per_code(
+            lambda m: m._cond_ind_effects_wrapper() if m._has_moderation else m._simple_ind_effects_wrapper()
         )
 
     def summary(self):
@@ -1560,24 +1636,27 @@ class ParallelMediationModel(object):
             "CMM": ("CONDITIONAL MODERATED MEDIATION", self._CMM_index_wrapper),
         }
         symb_to_var = self._symb_to_var
+        relative = "Relative " if self._categorical_x else ""
         if self._has_moderation:
             basestr = (
-                "Conditional indirect effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                "{rel}onditional indirect effect(s) of {x} on {y} at values of the moderator(s):\n\n"
                 "{coeffs}\n\n".format(
+                    rel="Relative c" if self._categorical_x else "C",
                     x=symb_to_var["x"],
                     y=symb_to_var["y"],
                     coeffs=self.coeff_summary().to_string(float_format=float_format),
                 )
             )
         else:
-            basestr = "Indirect effect of {x} on {y}:\n\n" "{coeffs}\n\n".format(
+            basestr = "{rel}ndirect effect of {x} on {y}:\n\n" "{coeffs}\n\n".format(
+                rel="Relative i" if self._categorical_x else "I",
                 x=symb_to_var["x"],
                 y=symb_to_var["y"],
                 coeffs=self.coeff_summary().to_string(float_format=float_format),
             )
         for a in self._analysis_list:
-            name, get_results = analysis_func[a]
-            results = get_results()
+            name, _ = analysis_func[a]
+            results = getattr(self, f"{a}_index_summary")()
             basestr += (
                 "**************** INDEX OF {name} ******************\n\n"
                 "{results}\n\n".format(
@@ -1587,7 +1666,10 @@ class ParallelMediationModel(object):
         if self._options.get("effsize"):
             from . import effsize as _effsize
 
-            basestr += _effsize.effect_size_text(self, float_format)
+            for view, label in zip(self._views(), self._x_labels):
+                if self._categorical_x:
+                    basestr += f"{relative}effects for {label}:\n\n"
+                basestr += _effsize.effect_size_text(view, float_format)
         return basestr
 
     def __str__(self):
@@ -1596,11 +1678,13 @@ class ParallelMediationModel(object):
 
 class DirectEffectModel(object):
     def __init__(
-            self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None
+            self, model, mod_symb, spot_values, has_mediation, symb_to_var, options=None,
+            x_symbs=("x",), x_labels=None, mod_codes=None,
     ):
         """
         A container for the direct effect of the variable X on the outcome Y. If the model includes one or several
-        moderators of X, this container returns the conditional direct effects.
+        moderators of X, this container returns the conditional direct effects. With a multicategorical X, one
+        relative effect per code (#17).
         :param model: process.OutcomeModel
             The OutcomeModel object of the outcome Y.
         :param mod_symb: list of string
@@ -1618,7 +1702,12 @@ class DirectEffectModel(object):
         self._model = model
         self._is_logit = isinstance(model, (LogitOutcomeModel, NegBinOutcomeModel))  # z-based inference
         self._symb_to_var = symb_to_var
-        self._derivative = self._model._derivative
+        self._x_symbs = list(x_symbs)
+        self._x_labels = list(x_labels) if x_labels else [symb_to_var.get("x", "x")]
+        self._categorical_x = len(self._x_symbs) > 1
+        self._mod_codes = mod_codes or {}
+        self._derivatives = {xs: self._model._gen_derivative(wrt=xs) for xs in self._x_symbs}
+        self._derivative = self._derivatives[self._x_symbs[0]]
         self._has_mediation = has_mediation
         self._moderators_symb = mod_symb
         self._moderators_values = [
@@ -1645,23 +1734,49 @@ class DirectEffectModel(object):
         """
         model = self._model
         exog = list(model._exogvars)
-        with_x = [t for t in exog if "*" in t and "x" in t.split("*")]
+        x_set = set(self._x_symbs)
+        with_x = [t for t in exog if "*" in t and (set(t.split("*")) & x_set)]
         if not with_x:
             return None, []
         order = max(len(t.split("*")) for t in with_x)
         terms = [t for t in with_x if len(t.split("*")) == order]
-        pvalues = []
+        # With multicategorical variables, the codes of one interaction form a single joint test (#17): group the
+        # terms by the interaction they belong to, ignoring the code digits.
+        code_of = {}
+        for symb, codes in self._code_groups().items():
+            for c in codes:
+                code_of[c] = symb
+        groups = {}
         for term in terms:
+            key = "*".join(code_of.get(f, f) for f in term.split("*"))
+            groups.setdefault(key, []).append(term)
+        pvalues = []
+        for members in groups.values():
             if self._is_logit:
                 reduced = type(model)(
-                    model._data, model._endogvar, [t for t in exog if t != term],
+                    model._data, model._endogvar, [t for t in exog if t not in members],
                     model._symb_to_ind, model._symb_to_var, model._options,
                 )
                 chi2 = 2 * (model.estimation_results["llf"] - reduced.estimation_results["llf"])
-                pvalues.append(float(stats.chi2.sf(max(chi2, 0.0), 1)))
-            else:
-                pvalues.append(float(np.asarray(model.estimation_results["p"]).ravel()[exog.index(term)]))
+                pvalues.append(float(stats.chi2.sf(max(chi2, 0.0), len(members))))
+            elif len(members) == 1:
+                pvalues.append(float(np.asarray(model.estimation_results["p"]).ravel()[exog.index(members[0])]))
+            else:  # Wald F test of the joint interaction under the model's covariance estimator
+                idx = [exog.index(t) for t in members]
+                b = np.asarray(model.estimation_results["betas"])[idx]
+                v = np.asarray(model.estimation_results["vcv"])[np.ix_(idx, idx)]
+                f = float(b @ np.linalg.solve(v, b)) / len(idx)
+                pvalues.append(float(stats.f.sf(f, len(idx), model.estimation_results["df_e"])))
         return min(pvalues), [self._symb_to_var.get(t, t) for t in terms]
+
+    def _code_groups(self):
+        """{symbol: [code symbols]} for X and for the categorical moderators (#17)."""
+        groups = {}
+        if self._categorical_x:
+            groups["x"] = list(self._x_symbs)
+        for mod in self._mod_codes:
+            groups[mod] = code_symbols(self._mod_codes, mod)
+        return groups
 
     @property
     def probed(self):
@@ -1690,9 +1805,8 @@ class DirectEffectModel(object):
         """
         mod_values = [i for i in product(*self._moderators_values)]
         mod_symb = self._moderators_symb
-        betas, se, llci, ulci = self._get_conditional_direct_effects(
-            mod_symb, mod_values
-        )
+        per_code = [self._get_conditional_direct_effects(mod_symb, mod_values, xs) for xs in self._x_symbs]
+        betas, se, llci, ulci = (np.concatenate([stats[i] for stats in per_code]) for i in range(4))
         t = betas / se
         if self._is_logit:
             p = stats.norm.sf(np.abs(t)) * 2
@@ -1709,22 +1823,71 @@ class DirectEffectModel(object):
         }
         return estimation_results
 
-    def _get_conditional_direct_effects(self, mod_symb, mod_values):
+    def _get_conditional_direct_effects(self, mod_symb, mod_values, x_symb=None):
         """
         Estimates the conditional direct effects of X on Y, at different values of the moderator(s)
         :param mod_symb: list of string
             A list of moderator symbols
         :param mod_values: array of int/float
-            A list of lists of spotlight values for each moderator.
+            A list of lists of spotlight values for each moderator (groups for a categorical moderator).
+        :param x_symb: the symbol of X, or of one of its codes (#17)
         :return:
         """
         betas, se, llci, ulci = np.zeros((4, len(mod_values)))
         for i, val in enumerate(
                 mod_values
         ):  # All possible products of level(s) of moderator(s)
-            mod_dict = {n: v for n, v in zip(mod_symb, val)}
-            betas[i], se[i], llci[i], ulci[i] = self._direct_effect_at(mod_dict)
+            betas[i], se[i], llci[i], ulci[i] = self._direct_effect_at(_mod_dict(mod_symb, val, self._mod_codes), x_symb)
         return betas, se, llci, ulci
+
+    def _gradient(self, mod_dict, x_symb=None):
+        """The gradient of the (relative) direct effect with respect to the coefficients, at moderator values."""
+        return eval_expression(self._derivatives[x_symb or self._x_symbs[0]], mod_dict)
+
+    def omnibus_test(self, at=None):
+        """
+        Joint test that the relative (conditional) direct effects of a multicategorical X are all zero (#17).
+        Without moderators this is PROCESS's "Omnibus test of direct effect of X on Y": for OLS the Wald F test
+        under the model's covariance estimator with the change in R-squared from dropping the codes, for a
+        logistic or negative binomial outcome the likelihood-ratio test. At values of the moderators (`at`, a
+        {name: value} dict) it is PROCESS's "Test of equality of conditional means": a Wald F or chi-square.
+        :return: one-row DataFrame
+        """
+        if not self._categorical_x:
+            raise ValueError("The omnibus test needs a multicategorical X (mcx).")
+        results = self._model.estimation_results
+        b, vcv = results["betas"], results["vcv"]
+        q = len(self._x_symbs)
+        names = {v: k for k, v in self._symb_to_var.items()}
+        at = {names.get(k, k): v for k, v in (at or {}).items()}
+        mod_dict = _mod_dict(self._moderators_symb, [at.get(m, 0) for m in self._moderators_symb], self._mod_codes)
+        if at is None or not at:
+            mod_dict = _mod_dict(self._moderators_symb, [0] * len(self._moderators_symb), self._mod_codes)
+        gradients = np.array([self._gradient(mod_dict, xs) for xs in self._x_symbs])
+        estimate = gradients @ b
+        wald = float(estimate @ np.linalg.solve(gradients @ vcv @ gradients.T, estimate))
+        if self._is_logit:
+            if not at:  # likelihood-ratio test of the codes, as PROCESS prints for a binary outcome
+                model = self._model
+                keep = [t for t in model._exogvars if not (set(t.split("*")) & set(self._x_symbs))]
+                reduced = type(model)(model._data, model._endogvar, keep, model._symb_to_ind, model._symb_to_var, model._options)
+                chi2 = 2 * (results["llf"] - reduced.estimation_results["llf"])
+                df = len(model._exogvars) - len(keep)
+            else:
+                chi2, df = wald, q
+            return pd.DataFrame([[chi2, df, stats.chi2.sf(chi2, df)]], index=[""], columns=["Chi-sq", "df", "p"])
+        df2 = results["df_e"]
+        f = wald / q
+        p = stats.f.sf(f, q, df2)
+        if at:
+            return pd.DataFrame([[f, q, df2, p]], index=[""], columns=["F", "df1", "df2", "p"])
+        model = self._model
+        keep = [i for i, t in enumerate(model._exogvars) if not (set(t.split("*")) & set(self._x_symbs))]
+        reduced_betas = fast_OLS(model._endog, model._exog[:, keep])
+        sse = np.sum((model._endog - model._exog[:, keep] @ reduced_betas) ** 2)
+        sst = np.sum((model._endog - model._endog.mean()) ** 2)
+        r2_change = results["R2"] - (1 - sse / sst)
+        return pd.DataFrame([[r2_change, f, q, df2, p]], index=[""], columns=["R2-chng", "F", "df1", "df2", "p"])
 
     def _floodlight_analysis(
             self, mod_symb, modval_range, other_modval_symb, atol=1e-8, rtol=1e-5
@@ -1751,11 +1914,12 @@ class DirectEffectModel(object):
         )
         return sig_region
 
-    def _direct_effect_at(self, mod_dict):
+    def _direct_effect_at(self, mod_dict, x_symb=None):
         """
         Compute the direct effect at specific value(s) of the moderator(s)
         :param mod_dict: dict
             None, or a mod_symb:mod_value dictionary of moderator values.
+        :param x_symb: the symbol of X or of one of its codes (#17); the first one by default
         :return: e: scalar
                     Effect at the moderator values
                  se: scalar
@@ -1768,10 +1932,7 @@ class DirectEffectModel(object):
         conf = self._options["conf"]
         b = self._model.estimation_results["betas"]
         vcv = self._model.estimation_results["vcv"]
-        deriv = self._derivative
-        grad = eval_expression(
-            deriv, mod_dict
-        )  # Gradient at level(s) of the moderator(s)
+        grad = self._gradient(mod_dict, x_symb)  # Gradient at level(s) of the moderator(s)
         betas = dot(grad, b)  # Estimate is dot product of gradient and coefficients
         var = dot(
             dot(grad, vcv), np.transpose(grad)
@@ -1807,11 +1968,14 @@ class DirectEffectModel(object):
                 coeffs_columns = ["Effect", "SE", "Z", "p", "LLCI", "ULCI"]
             else:
                 coeffs_columns = ["Effect", "SE", "t", "p", "LLCI", "ULCI"]
-            mod_rows = np.array([i for i in product(*self._moderators_values)])
+            combos = [list(i) for i in product(*self._moderators_values)]
             mod_columns = [symb_to_var.get(x, x) for x in self._moderators_symb]
-            rows = np.concatenate([mod_rows, coeffs_rows], axis=1)
-            columns = mod_columns + coeffs_columns
-            df = pd.DataFrame(rows, columns=columns, index=[""] * rows.shape[0])
+            levels = pd.DataFrame(combos * len(self._x_symbs), columns=mod_columns)
+            numbers = pd.DataFrame(coeffs_rows, columns=coeffs_columns)
+            df = pd.concat([levels, numbers], axis=1)
+            df.index = [""] * len(df)
+            if self._categorical_x:  # one block per code, labelled in a first column (#17)
+                df.insert(0, "X", np.repeat(self._x_labels, len(combos)))
             return df
         else:
             raise NotImplementedError(
@@ -1827,11 +1991,13 @@ class DirectEffectModel(object):
         symb_to_var = self._symb_to_var
         prec = self._options["precision"]
         float_format = partial("{:.{prec}f}".format, prec=prec)
+        rel = "Relative " if self._categorical_x else ""
         if self._has_mediation:
             if self._has_moderation:
                 basestr = (
-                    "Conditional direct effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                    "{rel}onditional direct effect(s) of {x} on {y} at values of the moderator(s):\n\n"
                     "{coeffs}\n".format(
+                        rel="Relative c" if self._categorical_x else "C",
                         x=symb_to_var["x"],
                         y=symb_to_var["y"],
                         coeffs=self.coeff_summary().to_string(
@@ -1840,15 +2006,17 @@ class DirectEffectModel(object):
                     )
                 )
             else:
-                basestr = "Direct effect of {x} on {y}:\n\n" "{coeffs}\n".format(
+                basestr = "{rel}irect effect of {x} on {y}:\n\n" "{coeffs}\n".format(
+                    rel="Relative d" if self._categorical_x else "D",
                     x=symb_to_var["x"],
                     y=symb_to_var["y"],
                     coeffs=self.coeff_summary().to_string(float_format=float_format),
                 )
         elif self.probed:
             basestr = (
-                "Conditional effect(s) of {x} on {y} at values of the moderator(s):\n\n"
+                "{rel}onditional effect(s) of {x} on {y} at values of the moderator(s):\n\n"
                 "{coeffs}\n".format(
+                    rel="Relative c" if self._categorical_x else "C",
                     x=symb_to_var["x"],
                     y=symb_to_var["y"],
                     coeffs=self.coeff_summary().to_string(float_format=float_format),
@@ -1856,7 +2024,27 @@ class DirectEffectModel(object):
             )
         else:  # PROCESS 3 and later probe only below intprobe (#87)
             basestr = self._not_probed_text()
+        if self._categorical_x and (self._has_mediation or self.probed):
+            basestr += "\n" + self.omnibus_text(float_format)
         return basestr
+
+    def omnibus_text(self, float_format):
+        """The omnibus test(s) of a multicategorical X as PROCESS prints them (#17)."""
+        x, y = self._symb_to_var["x"], self._symb_to_var["y"]
+        if not self._has_moderation:
+            kind = "likelihood ratio test" if self._is_logit else "test"
+            return "Omnibus {kind} of direct effect of {x} on {y}:\n\n{table}\n".format(
+                kind=kind, x=x, y=y, table=self.omnibus_test().to_string(float_format=float_format)
+            )
+        mod_names = [self._symb_to_var.get(m, m) for m in self._moderators_symb]
+        rows = []
+        for combo in product(*self._moderators_values):
+            test = self.omnibus_test(at=dict(zip(mod_names, combo)))
+            rows.append(list(combo) + test.iloc[0].tolist())
+        table = pd.DataFrame(rows, columns=mod_names + list(test.columns), index=[""] * len(rows))
+        return "Test of equality of the conditional means of {y} across the groups of {x}:\n\n{table}\n".format(
+            x=x, y=y, table=table.to_string(float_format=float_format)
+        )
 
     def __str__(self):
         return self.summary()
