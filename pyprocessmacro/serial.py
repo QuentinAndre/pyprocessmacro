@@ -12,9 +12,9 @@ from itertools import combinations
 
 import numpy as np
 
-from .bootstrap import bootstrap_equations
+from .bootstrap import bootstrap_equations, family_of, fit_outcome
 from .models import _summary_table
-from .utils import bias_corrected_ci, fast_OLS, fast_optimize, percentile_ci
+from .utils import bias_corrected_ci, fast_OLS, percentile_ci
 
 
 class SerialMediationModel(object):
@@ -101,13 +101,9 @@ class SerialMediationModel(object):
     def _estimate_true_params(self):
         endog_y = self._data[:, self._ind_y]
         exog_y = self._data[:, self._exog_inds_y]
-        if self._options["logit"]:
-            betas_y = fast_optimize(
-                endog_y, exog_y, n_obs=self._n_obs, n_vars=len(self._exog_inds_y),
-                max_iter=self._options["iterate"], tolerance=self._options["convergence"],
-            )
-        else:
-            betas_y = fast_OLS(endog_y, exog_y)
+        betas_y = fit_outcome(
+            endog_y, exog_y, family_of(self._options), self._options["iterate"], self._options["convergence"]
+        )
         betas_m = [
             fast_OLS(self._data[:, ind], self._data[:, exog_inds])
             for ind, exog_inds in zip(self._inds_m, self._exog_inds_m_list)
@@ -115,8 +111,8 @@ class SerialMediationModel(object):
         return betas_y, betas_m
 
     def _estimate_bootstrapped_params(self):
-        equations = [(self._ind_y, self._exog_inds_y, bool(self._options["logit"]))] + [
-            (ind, exog_inds, False) for ind, exog_inds in zip(self._inds_m, self._exog_inds_m_list)
+        equations = [(self._ind_y, self._exog_inds_y, family_of(self._options))] + [
+            (ind, exog_inds, "ols") for ind, exog_inds in zip(self._inds_m, self._exog_inds_m_list)
         ]
         betas, n_fail, self._boot_sds = bootstrap_equations(
             self._data, equations, self._options["boot"], self._options["seed"],

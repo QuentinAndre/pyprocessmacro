@@ -8,6 +8,7 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `family="negbin"`: negative binomial regression for a count outcome Y (NB2, log link, maximum likelihood, batched over the bootstrap like the logistic fits), a PyProcessMacro extension that PROCESS does not offer; the mediator equations stay OLS. `family="logit"` is the same as `logit=True`. `glance()` gains an `alpha` column and `to_statsmodels()` returns the `NegativeBinomial` refit (#25).
 - `spotlight` option for the values at which continuous moderators are probed: `"moments"` (the default, and the PROCESS 2 rule), `"percentiles"` (the 16th, 50th and 84th percentiles computed as PROCESS 3 and later do) or `"quantiles"` (the `quantile=True` rule). Under `"percentiles"` a moderator is probed at its two values only when dichotomous, as PROCESS does (#87, #90).
 - `intprobe` option: models 1 to 3 report their conditional effects only when the highest-order interaction of X has p at most `intprobe` (default 1, always, as PROCESS 2; PROCESS 3 and later use 0.10). `direct_model.probe_p` and `direct_model.probed` expose the test PROCESS compares to it: the coefficient's test for OLS, a likelihood-ratio test for a binary outcome (#87).
 - The initialization banner, `summary()` and the notebook display start with the conventions in force (interval type, spotlight rule, probing threshold) and the PROCESS release each is the default of, so a saved output says how its numbers were produced (#87).

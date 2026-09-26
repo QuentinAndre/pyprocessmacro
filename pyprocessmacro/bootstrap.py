@@ -10,21 +10,41 @@ samples one by one so that failures are detected per sample exactly as before.
 import numpy as np
 from numpy.linalg import LinAlgError
 
+from . import negbin
 from .utils import ConvergenceError, bootstrap_sampler, fast_OLS, fast_optimize
 
 # Upper bound on the number of floating-point values held by one chunk of resampled data.
 CHUNK_ELEMENTS = 10_000_000
 
 
-class BootstrapSpec:
-    """Which columns of the data array are which, and how the outcome equation is estimated."""
+def family_of(options):
+    """The estimator of the outcome equation named by the options: 'ols', 'logit' or 'negbin' (#25)."""
+    return options.get("family") or ("logit" if options.get("logit") else "ols")
 
-    def __init__(self, ind_y, exog_inds_y, inds_m, exog_inds_m, logit, max_iter, tolerance):
+
+def _as_family(kind):
+    """A family name from a family name or from the pre-2.2 logit boolean."""
+    if kind is True:
+        return "logit"
+    if kind is False or kind is None:
+        return "ols"
+    return kind
+
+
+class BootstrapSpec:
+    """
+    Which columns of the data array are which, and how the outcome equation is estimated: family "ols",
+    "logit" or "negbin" (#25). The pre-2.2 logit boolean is still accepted.
+    """
+
+    def __init__(self, ind_y, exog_inds_y, inds_m, exog_inds_m, family="ols", max_iter=10000, tolerance=1e-10,
+                 logit=None):
         self.ind_y = ind_y
         self.exog_inds_y = list(exog_inds_y)
         self.inds_m = list(inds_m)
         self.exog_inds_m = list(exog_inds_m)
-        self.logit = bool(logit)
+        self.family = _as_family(family if logit is None else logit)
+        self.logit = self.family == "logit"
         self.max_iter = max_iter
         self.tolerance = tolerance
 
@@ -81,11 +101,7 @@ def _fit_chunk(chunk, spec):
     exog_m = chunk[:, :, spec.exog_inds_m]
     endog_m = chunk[:, :, spec.inds_m]
     try:
-        if spec.logit:
-            betas_y, failed = _batch_logit(y, exog_y, spec.max_iter, spec.tolerance)
-        else:
-            betas_y = _batch_ols(y[..., None], exog_y)[..., 0]
-            failed = ~np.isfinite(betas_y).all(axis=1)
+        betas_y, failed = batch_outcome(y, exog_y, spec.family, spec.max_iter, spec.tolerance)
         betas_m = _batch_ols(endog_m, exog_m)  # (c, k_m, n_meds)
     except LinAlgError:
         return _fit_one_by_one(chunk, spec)
@@ -102,18 +118,36 @@ def _fit_one_by_one(chunk, spec):
     for i in range(count):
         sample = chunk[i]
         try:
-            if spec.logit:
-                betas_y[i] = fast_optimize(
-                    sample[:, spec.ind_y], sample[:, spec.exog_inds_y], n_obs=sample.shape[0],
-                    n_vars=len(spec.exog_inds_y), max_iter=spec.max_iter, tolerance=spec.tolerance,
-                )
-            else:
-                betas_y[i] = fast_OLS(sample[:, spec.ind_y], sample[:, spec.exog_inds_y])
+            betas_y[i] = fit_outcome(
+                sample[:, spec.ind_y], sample[:, spec.exog_inds_y], spec.family, spec.max_iter, spec.tolerance
+            )
             for j, ind in enumerate(spec.inds_m):
                 betas_m[j, i] = fast_OLS(sample[:, ind], sample[:, spec.exog_inds_m])
         except (LinAlgError, ConvergenceError):
             failed[i] = True
     return betas_y, betas_m, failed
+
+
+def batch_outcome(endog, exog, family, max_iter, tolerance):
+    """The outcome equation on a batch, by family: (c x k) betas and (c,) failed flags."""
+    if family == "logit":
+        return _batch_logit(endog, exog, max_iter, tolerance)
+    if family == "negbin":
+        params, failed = negbin.batch_fit(endog, exog, max_iter, tolerance)
+        return params[:, :-1], failed  # the last parameter is log alpha
+    betas = _batch_ols(endog[..., None], exog)[..., 0]
+    return betas, ~np.isfinite(betas).all(axis=1)
+
+
+def fit_outcome(endog, exog, family, max_iter, tolerance):
+    """One outcome equation, by family. Raises LinAlgError or ConvergenceError when it cannot be estimated."""
+    if family == "logit":
+        return fast_optimize(
+            endog, exog, n_obs=exog.shape[0], n_vars=exog.shape[1], max_iter=max_iter, tolerance=tolerance
+        )
+    if family == "negbin":
+        return negbin.fit_betas(endog, exog, max_iter, tolerance)
+    return fast_OLS(endog, exog)
 
 
 def _batch_ols(endog, exog):
@@ -174,7 +208,8 @@ def bootstrap_equations(data, equations, n_boots, seed, max_iter=10000, toleranc
     """
     Estimate several equations, each with its own design matrix, on n_boots resamples (serial mediation).
 
-    :param equations: list of (endog_ind, exog_inds, logit) triples
+    :param equations: list of (endog_ind, exog_inds, family) triples; family is "ols", "logit" or "negbin"
+        (a boolean is read as the pre-2.2 logit flag)
     :param sd_inds: columns whose standard deviation is wanted for every successful resample (#70)
     :return: (list of (n_boots x k_i) arrays, one per equation, n_fail, sds or None)
     """
@@ -208,13 +243,9 @@ def _fit_equations_chunk(chunk, equations, max_iter, tolerance):
     failed = np.zeros(chunk.shape[0], dtype=bool)
     estimates = []
     try:
-        for endog_ind, exog_inds, logit in equations:
+        for endog_ind, exog_inds, kind in equations:
             endog, exog = chunk[:, :, endog_ind], chunk[:, :, exog_inds]
-            if logit:
-                betas, bad = _batch_logit(endog, exog, max_iter, tolerance)
-            else:
-                betas = _batch_ols(endog[..., None], exog)[..., 0]
-                bad = ~np.isfinite(betas).all(axis=1)
+            betas, bad = batch_outcome(endog, exog, _as_family(kind), max_iter, tolerance)
             estimates.append(betas)
             failed |= bad
     except LinAlgError:
@@ -229,14 +260,8 @@ def _fit_equations_one_by_one(chunk, equations, max_iter, tolerance):
     for i in range(count):
         sample = chunk[i]
         try:
-            for store, (endog_ind, exog_inds, logit) in zip(estimates, equations):
-                if logit:
-                    store[i] = fast_optimize(
-                        sample[:, endog_ind], sample[:, exog_inds], n_obs=sample.shape[0],
-                        n_vars=len(exog_inds), max_iter=max_iter, tolerance=tolerance,
-                    )
-                else:
-                    store[i] = fast_OLS(sample[:, endog_ind], sample[:, exog_inds])
+            for store, (endog_ind, exog_inds, kind) in zip(estimates, equations):
+                store[i] = fit_outcome(sample[:, endog_ind], sample[:, exog_inds], _as_family(kind), max_iter, tolerance)
         except (LinAlgError, ConvergenceError):
             failed[i] = True
     return estimates, failed

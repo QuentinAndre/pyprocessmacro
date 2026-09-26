@@ -33,6 +33,7 @@ GLANCE_COLUMNS = [
     "mcfadden",
     "cox_snell",
     "nagelkerke",
+    "alpha",
     "aic",
     "bic",
 ]
@@ -75,11 +76,10 @@ def tidy(process, component=None):
     # Outcome models: one row per coefficient.
     for outcome, model in process.outcome_models.items():
         res = model.estimation_results
-        is_logit = "z" in res
-        statistic = res["z" if is_logit else "t"]
+        statistic = res["z" if "z" in res else "t"]
         for i, term in enumerate(res["names"]):
             add("outcome", outcome, term, res["betas"][i], res["se"][i], res["llci"][i], res["ulci"][i],
-                "logit" if is_logit else "ols", statistic[i], res["p"][i])
+                _estimator(res), statistic[i], res["p"][i])
 
     # Direct (or, for models 1 to 3, conditional) effects of X on Y.
     direct = process.direct_model
@@ -87,7 +87,7 @@ def tidy(process, component=None):
     direct_mods = [stv[s] for s in direct._moderators_symb]
     for i, combo in enumerate(product(*direct._moderators_values)):
         add("direct", dv, stv["x"], res["betas"][i], res["se"][i], res["llci"][i], res["ulci"][i],
-            "logit" if direct._is_logit else "ols", res["t"][i], res["p"][i],
+            _estimator(direct._model.estimation_results), res["t"][i], res["p"][i],
             at=dict(zip(direct_mods, combo)))
 
     if not process.has_mediation:
@@ -157,6 +157,11 @@ def tidy(process, component=None):
     return _finish(rows, columns, component)
 
 
+def _estimator(res):
+    """The name of the estimator behind an outcome model's results: ols, logit or negbin (#25)."""
+    return "negbin" if "alpha" in res else ("logit" if "z" in res else "ols")
+
+
 def _finish(rows, columns, component):
     frame = pd.DataFrame(rows, columns=columns)
     if component is not None:
@@ -176,8 +181,9 @@ def glance(process):
     One row of fit statistics per outcome model.
 
     OLS rows fill r_squared, adj_r_squared, mse, f_statistic, df_model, df_resid and p_value; logistic
-    rows fill ll_null, lr_statistic, df_model, p_value, mcfadden, cox_snell and nagelkerke. Both fill
-    n, log_likelihood, aic and bic.
+    rows fill ll_null, lr_statistic, df_model, p_value, mcfadden, cox_snell and nagelkerke; negative
+    binomial rows fill ll_null, lr_statistic, df_model, p_value, mcfadden and alpha (#25). All fill n,
+    log_likelihood, aic and bic.
     """
     rows = []
     for outcome, model in process.outcome_models.items():
@@ -185,7 +191,10 @@ def glance(process):
         row = {c: np.nan for c in GLANCE_COLUMNS}
         row.update(outcome=outcome, cov_type=res["cov_type"], n=res["n"], log_likelihood=res["llf"],
                    aic=res["aic"], bic=res["bic"])
-        if "z" in res:
+        if "alpha" in res:
+            row.update(estimator="negbin", ll_null=res["llnull"], lr_statistic=res["d"], df_model=res["df_model"],
+                       p_value=res["pvalue"], mcfadden=res["mcfadden"], alpha=res["alpha"])
+        elif "z" in res:
             row.update(estimator="logit", ll_null=res["llnull"], lr_statistic=res["d"], df_model=res["df_model"],
                        p_value=res["pvalue"], mcfadden=res["mcfadden"], cox_snell=res["coxsnell"],
                        nagelkerke=res["nagelkerke"])
@@ -200,8 +209,9 @@ def augment(process, outcome=None):
     """
     The analysis data (rows kept after listwise deletion, user variable names) with, for each outcome
     model, a `.fitted_<outcome>` and a `.resid_<outcome>` column. For a logistic outcome the fitted
-    value is the predicted probability and the residual is the response residual. A logistic outcome
-    appears as the 0/1 recoding the model was fitted on.
+    value is the predicted probability, for a negative binomial outcome the predicted count, and the
+    residual is the response residual. A logistic outcome appears as the 0/1 recoding the model was
+    fitted on.
 
     :param outcome: None for every outcome model, or the name of one outcome.
     """

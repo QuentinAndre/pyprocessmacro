@@ -7,11 +7,13 @@ import numpy as np
 import pandas as pd
 
 from .serial import SerialMediationModel
+from . import negbin
 from .models import (
     OLSOutcomeModel,
     DirectEffectModel,
     ParallelMediationModel,
     LogitOutcomeModel,
+    NegBinOutcomeModel,
     DirectFloodlightAnalysis,
     IndirectFloodlightAnalysis,
 )
@@ -44,6 +46,7 @@ class Process(object):
         "convergence",
         "precision",
         "logit",
+        "family",
         "modval",
         "controls",
         "spotlight",
@@ -603,6 +606,7 @@ class Process(object):
             suppr_init=False,
             spotlight=None,
             intprobe=1.0,
+            family=None,
             **kwargs,
     ):
         """
@@ -677,7 +681,13 @@ class Process(object):
             of PROCESS 3 and later; if False (the default), bias-corrected intervals, the default of PROCESS 2.
         :param logit: bool
             If True, and if the outcome is a binary variable, then a logistic regression will be used to
-            estimate the parameters of its equation.
+            estimate the parameters of its equation. The same as family="logit".
+        :param family: "ols", "logit" or "negbin"
+            The estimator of the outcome equation (Y): OLS (the default), logistic regression for a binary Y,
+            or negative binomial regression for a count Y (#25). The negative binomial is a PyProcessMacro
+            extension that PROCESS does not offer: the b path is then on the log-count scale and the indirect
+            effect a*b mixes an OLS coefficient with it, as PROCESS's logistic case does. The mediator
+            equations stay OLS. The dispersion alpha is reported in the model summary.
         :param iterate: int
             The maximum number of iterations for the Newton-Raphson algorithm of the logistic regression.
         :param convergence: float
@@ -813,8 +823,8 @@ class Process(object):
             if not self.has_mediation:
                 raise ValueError("The option 'effsize' standardizes indirect effects; Model "
                                  f"{self.model_num} has no mediator.")
-            if self.options["logit"]:
-                raise ValueError("The option 'effsize' requires a continuous outcome (logit=False).")
+            if self.options["family"] != "ols":
+                raise ValueError("The option 'effsize' requires a continuous outcome (family='ols').")
             if self._moderators["indirect"]:
                 raise ValueError("The option 'effsize' is available for unmoderated indirect paths only "
                                  "(models 4 and 6).")
@@ -918,6 +928,11 @@ class Process(object):
             errstr += "The option 'jn' must be 'True' or 'False'.\n"
         if options["logit"] not in [True, False]:
             errstr += "The option 'logit' must be 'True' or 'False'.\n"
+        family = options["family"]
+        if family not in (None, "ols", "logit", "negbin"):
+            errstr += "The option 'family' must be one of 'ols', 'logit' or 'negbin'.\n"
+        elif options["logit"] is True and family not in (None, "logit"):
+            errstr += "The options 'logit' and 'family' disagree; use one or the other.\n"
         if options["controls_in"] not in ["all", "x_to_m", "all_to_y"]:
             errstr += "The option 'controls_in' should be one of 'all', 'x_to_m', 'all_to_y'\n"
         if not isinstance(options["modval"], dict):
@@ -947,6 +962,8 @@ class Process(object):
                 f"Model {self.model_num} is not a PROCESS model number: PyProcessMacro implements models 1 to 76."
             )
         options["intprobe"] = float(options["intprobe"])
+        options["family"] = options["family"] or ("logit" if options["logit"] else "ols")
+        options["logit"] = options["family"] == "logit"
         if options["spotlight"] is None:
             options["spotlight"] = "quantiles" if options["quantile"] else "moments"
         return options
@@ -1134,6 +1151,8 @@ class Process(object):
             else:
                 endog_logit = [0 if i == uniques[0] else 1 for i in endog]
             data["y"] = endog_logit
+        if self.options["family"] == "negbin":
+            negbin.check_counts(data["y"], self.iv)
 
         centered_vars = []
         if self.options["center"]:
@@ -1180,7 +1199,11 @@ class Process(object):
         y_equation = self._equations[0]
         y_endog = y_equation[0]
         y_exogs = y_equation[1]
-        if self.options["logit"]:
+        if self.options["family"] == "negbin":
+            model_yfull = NegBinOutcomeModel(
+                data_array, y_endog, y_exogs, self._symb_to_ind, self._symb_to_var, self.options
+            )
+        elif self.options["logit"]:
             model_yfull = LogitOutcomeModel(
                 data_array,
                 y_endog,
@@ -1514,6 +1537,8 @@ class Process(object):
             return ""
 
         parts = []
+        if o["family"] == "negbin":
+            parts.append("Outcome: negative binomial regression, a PyProcessMacro extension that PROCESS does not offer.")
         if self.has_mediation:
             parts.append(f"Bootstrap intervals: {'percentile' if o['percent'] else 'bias-corrected'}{tag('percent')}.")
         if self._moderators["all"]:
