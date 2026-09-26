@@ -52,20 +52,20 @@ class Process(object):
     }
 
     # The conventions of the PROCESS releases whose output the test suite holds (#87): the value an argument
-    # left at None takes, the spotlight rule for continuous moderators, the probing threshold of models 1 to 3,
-    # and the model numbers the release accepts. PROCESS 3 dropped the third and fourth moderators (models 23
-    # to 27 and 30 to 57 of the 2.16 numbering) and PROCESS 4.2 discontinued model 74 in favour of the xmint
-    # option of model 4, which reports counterfactual natural effects instead.
+    # left at None takes, the spotlight rule for continuous moderators and the probing threshold of models 1 to 3.
     VERSIONS = {
-        "2.16": {"percent": False, "spotlight": "moments", "intprobe": 1.0, "models": set(range(1, 77))},
-        "5.0": {
-            "percent": True,
-            "spotlight": "percentiles",
-            "intprobe": 0.10,
-            "models": set(range(1, 77)) - set(range(23, 28)) - set(range(30, 58)) - {74},
-        },
+        "2.16": {"percent": False, "spotlight": "moments", "intprobe": 1.0},
+        "5.0": {"percent": True, "spotlight": "percentiles", "intprobe": 0.10},
     }
     VERSION_ALIASES = {"2": "2.16", "5": "5.0"}
+
+    # Models that a later PROCESS release retired. They are estimated under every version, as PROCESS 2.16
+    # defined them, with a note (#91): PROCESS 3.0 dropped the third and fourth moderators (models 23 to 27 and
+    # 30 to 57), and PROCESS 4.0 dropped model 74, which 4.2 replaced with the xmint option of model 4.
+    RETIRED = {
+        **{n: ("3.0", "PROCESS 3 and later have no third or fourth moderator") for n in (*range(23, 28), *range(30, 58))},
+        74: ("4.0", "replaced by the xmint option of model 4, which reports counterfactual natural effects"),
+    }
 
     __models_vars__ = {
         1: {"x", "m", "y"},
@@ -681,11 +681,12 @@ class Process(object):
             The number of decimal places to display in the summary of the model results.
         :param version: "2.16" or "5.0"
             The PROCESS release whose conventions to reproduce (#87): the type of bootstrap interval, the
-            spotlight values of continuous moderators, the probing threshold of models 1 to 3, and the model
-            numbers accepted. An argument passed explicitly always wins over the version's default. "2.16",
-            the default, is what PyProcessMacro has always produced; "5.0" reproduces PROCESS for R 5.0, which
-            refuses models 23 to 27, 30 to 57 and 74. The conventions in force are stated in the initialization
-            banner and at the top of summary().
+            spotlight values of continuous moderators and the probing threshold of models 1 to 3. An argument
+            passed explicitly always wins over the version's default. "2.16", the default, is what PyProcessMacro
+            has always produced; "5.0" reproduces PROCESS for R 5.0. Every model is estimated under every
+            version; a note (also a UserWarning) names the release that retired models 23 to 27 and 30 to 57
+            (3.0) and model 74 (4.0). The conventions in force are stated in the initialization banner and at
+            the top of summary().
         :param intprobe: float between 0 and 1, or None
             Models 1 to 3 report their conditional effects only when the p-value of the highest-order
             interaction of X is at most intprobe, as PROCESS 3 and later do. None follows the version: 1 under
@@ -767,6 +768,9 @@ class Process(object):
         # Validate the arguments supplied as options, and resolve the defaults the PROCESS version sets (#87)
         self.options = self._gen_valid_options(arguments)
         self.version = self.options["version"]
+        self.retired_note = self._retired_note()
+        if self.retired_note:
+            warnings.warn(self.retired_note, UserWarning, stacklevel=2)
 
         # Check the congruence between the model specifications, the model number, and the data, and store the final
         # list of variables used
@@ -957,17 +961,6 @@ class Process(object):
             raise ValueError(
                 f"Model {self.model_num} is not a PROCESS model number: PyProcessMacro implements models 1 to 76."
             )
-        if self.model_num not in conventions["models"]:
-            if self.model_num == 74:
-                reason = ("PROCESS 4.2 replaced it with the xmint option of model 4, which reports counterfactual "
-                          "natural effects instead")
-            else:
-                reason = ("PROCESS 3 and later have no third or fourth moderator (models 23 to 27 and 30 to 57 "
-                          "of PROCESS 2)")
-            raise ValueError(
-                f"Model {self.model_num} does not exist in PROCESS {options['version']}: {reason}. "
-                "Pass version='2.16' to estimate it as PROCESS 2.16 defined it."
-            )
         if options["percent"] is None:
             options["percent"] = conventions["percent"]
         if options["intprobe"] is None:
@@ -981,6 +974,16 @@ class Process(object):
         else:
             options["spotlight"] = conventions["spotlight"]
         return options
+
+    def _retired_note(self):
+        """The note for a model that a later PROCESS release retired, or None (#91)."""
+        if self.model_num not in self.RETIRED:
+            return None
+        release, reason = self.RETIRED[self.model_num]
+        return (
+            f"Note: Model {self.model_num} was retired in PROCESS {release} ({reason}); "
+            "PyProcessMacro estimates it as PROCESS 2.16 defined it."
+        )
 
     def _gen_valid_varlist(self, var_kwargs):
         """
@@ -1539,6 +1542,8 @@ class Process(object):
         if not self.has_mediation:
             probing = "always" if o["intprobe"] >= 1 else f"when the interaction's p is at most {o['intprobe']:g}"
             parts.append(f"Conditional effects reported: {probing}.")
+        if self.retired_note:
+            parts.append(self.retired_note)
         return " ".join(parts)
 
     # API
