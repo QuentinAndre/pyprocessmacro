@@ -20,6 +20,10 @@ project uses [Semantic Versioning](https://semver.org/).
 - `percent` defaults to None and takes the version's value: bias-corrected intervals under `"2.16"`, as before (#87).
 - The error for an invalid `quantile` value named the wrong option.
 
+### Fixed
+
+- README: the Model 6 section said that no PROCESS output file for it was part of the fixtures (#88).
+
 ## [2.1.0] - 2026-09-25
 
 Additive release, tracked in the

@@ -305,9 +305,8 @@ p.summary()
 ````
 
 Model 6 has no moderators, so the spotlight, floodlight and plotting methods do not apply to it. Its estimates are
-checked against products of statsmodels coefficients and against an independent resampler; no PROCESS output for
-Model 6 is part of the test fixtures yet, so a comparison file generated with PROCESS 2.16 would be a welcome
-contribution.
+checked against the PROCESS 2.16 and PROCESS 5.0 output files for Model 6, against products of statsmodels
+coefficients and against an independent resampler.
 
 ### H. Effect sizes for the indirect effect
 
