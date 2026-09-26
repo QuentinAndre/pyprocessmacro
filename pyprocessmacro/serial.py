@@ -7,13 +7,14 @@ Y depends on X and every mediator. A specific indirect effect runs through any o
 mediators and equals the product of the coefficients along the path; with k mediators there are 2**k - 1
 of them, ordered as PROCESS orders them (by first mediator, then by length).
 """
+import copy
 from functools import partial
 from itertools import combinations
 
 import numpy as np
 
 from .bootstrap import bootstrap_equations, family_of, fit_outcome
-from .models import _summary_table
+from .models import _summary_table, _with_code_column
 from .utils import bias_corrected_ci, fast_OLS, percentile_ci
 
 
@@ -23,7 +24,8 @@ class SerialMediationModel(object):
 
     ANALYSIS_NAMES = {}
 
-    def __init__(self, data, equations, n_meds, symb_to_ind, symb_to_var, options=None):
+    def __init__(self, data, equations, n_meds, symb_to_ind, symb_to_var, options=None, x_symbs=("x",),
+                 x_labels=None, mod_codes=None):
         """
         :param data: (n_obs x n_cols) array of the analysis data
         :param equations: list of (endogenous symbol, exogenous terms); the first is the outcome equation,
@@ -32,8 +34,17 @@ class SerialMediationModel(object):
         :param symb_to_ind: symbol -> column index
         :param symb_to_var: symbol -> variable name
         :param options: the Process options
+        :param x_symbs: ("x",) or the codes of a multicategorical X (#17)
+        :param x_labels: the labels of the codes (X1, X2, ...)
+        :param mod_codes: unused (model 6 has no moderator); kept for a uniform interface
         """
         self._data = data
+        self._x_symbs = list(x_symbs)
+        self._x_symb = self._x_symbs[0]
+        self._x_labels = list(x_labels) if x_labels else [symb_to_var.get("x", "x")]
+        self._categorical_x = len(self._x_symbs) > 1
+        self._mod_codes = mod_codes or {}
+        self._code_views = None
         self._n_meds = n_meds
         self._symb_to_ind = symb_to_ind
         self._symb_to_var = symb_to_var
@@ -51,7 +62,7 @@ class SerialMediationModel(object):
         self._exog_inds_m_list = [[symb_to_ind[t] for t in terms] for terms in self._exog_terms_m_list]
 
         # Positions of the path coefficients in each equation.
-        self._pos_x_in_m = [terms.index("x") for terms in self._exog_terms_m_list]
+        self._pos_x_in_m = [terms.index(self._x_symb) for terms in self._exog_terms_m_list]
         self._pos_m_in_m = [
             {j: terms.index(f"m{j + 1}") for j in range(i)} for i, terms in enumerate(self._exog_terms_m_list)
         ]
@@ -141,7 +152,7 @@ class SerialMediationModel(object):
         """The standardized indirect effects as one table with a Standardization column (#70)."""
         from . import effsize as _effsize
 
-        return _effsize.effect_size_table(self)
+        return self._per_code(_effsize.effect_size_table)
 
     def _path_effect(self, path, betas_y, betas_m):
         """Product of the coefficients along a path; betas may be 1-D (estimates) or 2-D (bootstrap draws)."""
@@ -180,11 +191,36 @@ class SerialMediationModel(object):
         statistics = [np.array(v, dtype=float) for v in (effects, se, llci, ulci)]
         return dict(zip(["effect", "se", "llci", "ulci"], statistics))
 
+    def _views(self):
+        """One model per code of a multicategorical X, sharing the estimates and draws (#17); [self] otherwise."""
+        if not self._categorical_x:
+            return [self]
+        if self._code_views is None:
+            views = []
+            for xs, label in zip(self._x_symbs, self._x_labels):
+                view = copy.copy(self)
+                view._x_symbs, view._x_symb, view._x_labels = [xs], xs, [label]
+                view._categorical_x, view._code_views = False, None
+                view._pos_x_in_m = [terms.index(xs) for terms in self._exog_terms_m_list]
+                view.estimation_results = view._indirect_effects()
+                views.append(view)
+            self._code_views = views
+        return self._code_views
+
+    def _per_code(self, method):
+        if not self._categorical_x:
+            return method(self)
+        return _with_code_column([method(view) for view in self._views()], self._x_labels)
+
     def coeff_summary(self):
         """
-        The specific indirect effects (and the total and contrasts if asked), one row per path.
+        The specific indirect effects (and the total and contrasts if asked), one row per path; one block per
+        code, labelled in a first column "X", when X is multicategorical (#17).
         :return: DataFrame with columns "", Effect, Boot SE, BootLLCI, BootULCI
         """
+        return self._per_code(lambda m: m._coeff_summary_single())
+
+    def _coeff_summary_single(self):
         results = self.estimation_results
         rows_stats = np.array([results["effect"], results["se"], results["llci"], results["ulci"]]).T
         labels = []
@@ -201,13 +237,17 @@ class SerialMediationModel(object):
         prec = self._options["precision"]
         float_format = partial("{:.{prec}f}".format, prec=prec)
         stv = self._symb_to_var
-        text = "Indirect effect(s) of {x} on {y} through the serial mediators:\n\n{coeffs}\n\n".format(
+        text = "{rel}ndirect effect(s) of {x} on {y} through the serial mediators:\n\n{coeffs}\n\n".format(
+            rel="Relative i" if self._categorical_x else "I",
             x=stv["x"], y=stv["y"], coeffs=self.coeff_summary().to_string(float_format=float_format)
         )
         if self._options.get("effsize"):
             from . import effsize as _effsize
 
-            text += _effsize.effect_size_text(self, float_format)
+            for view, label in zip(self._views(), self._x_labels):
+                if self._categorical_x:
+                    text += f"Relative effects for {label}:\n\n"
+                text += _effsize.effect_size_text(view, float_format)
         return text
 
     def __str__(self):

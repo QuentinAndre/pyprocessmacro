@@ -59,9 +59,12 @@ The following changes and improvements have been made from the original Process 
   discarded because of numerical instability.
   * Count outcomes: with `family="negbin"`, the outcome Y is estimated by negative binomial regression (section
   1.J). This is not a PROCESS feature.
+  * Multicategorical X and moderators with PROCESS's `mcx` and `mcw` options and its four coding systems
+  (section 1.K); the groups may be numbers, strings or a pandas Categorical.
 
 In the current version, the following features have not yet been ported to PyProcessMacro:
-  * Support for categorical independent variables.
+  * With a multicategorical variable: the indices of partial, moderated moderated and conditional moderated
+  mediation, the floodlight analysis and the plots.
   * Generation of individual fixed effects for repeated measures.
   * R² improvement from moderators in moderation models (1, 2, 3).
   * Some options (`normal`, `varorder`, ...). PyProcessMacro will issue a warning to tell you if an option you are 
@@ -383,6 +386,36 @@ which it does not converge are discarded and counted, as for logistic outcomes. 
 the McFadden pseudo R-squared, `augment()` the predicted counts and response residuals, and `to_statsmodels()`
 the `statsmodels.NegativeBinomial` refit for diagnostics. The first line of `summary()` says that this estimator
 is an extension, so a saved output cannot be mistaken for PROCESS output.
+
+### K. Multicategorical X and moderators (`mcx`, `mcw`)
+
+A categorical X with three to nine groups is declared with `mcx`, and a categorical moderator with `mcw` (`mcz`,
+`mcv` and `mcq` for the other moderator symbols of the 2.16 numbering; in Models 1 to 3 the moderator passed as
+`m` is W). The value names PROCESS's coding system: `1` or `"indicator"` (dummy codes against the group with the
+smallest value), `2` or `"sequential"`, `3` or `"helmert"`, `4` or `"effect"`. The groups may be numbers,
+strings or a pandas Categorical; they are ordered by their sorted values, and every group needs at least two
+cases.
+
+````python
+p = Process(data=df, model=7, x="Condition", w="Motivation", m=["Attention"], y="Success", mcx="indicator")
+p.summary()
+````
+
+X is then represented by g - 1 codes X1, X2, ... whose mapping to the groups is printed at the top of the output,
+and everything PROCESS reports per code is reported per code: the relative direct effects, with an omnibus test
+of the direct effect (an F test under the covariance estimator in use, or a likelihood-ratio test for a binary or
+count outcome), the relative conditional direct effects, the relative indirect and conditional indirect effects,
+and one index of moderated mediation per code. In Models 1 to 3 the relative conditional effects come with a test
+of equality of the conditional means at each value of the moderator, as PROCESS prints. A categorical moderator
+is probed in each of its groups, and the index of moderated mediation is reported per code of the moderator (W1,
+W2, ...). The tables carry an `X` column for the code, `tidy()` an `x_code` column, and
+`spotlight_direct_effect()` and `spotlight_indirect_effect()` return one block per code. `effsize=True` reports
+the partially standardized effects only, as PROCESS does for a multicategorical X.
+
+Not available with a multicategorical variable: the indices of partial, moderated moderated and conditional
+moderated mediation (models with two moderators on the indirect path), the floodlight analysis, the plots, and
+`contrast` (which PROCESS refuses too); Model 74 does not take a multicategorical X. Every coding system and the
+models 1, 4, 5, 6, 7, 8, 14 and 58 are checked against PROCESS for R 5.0 (`tests/Results/v5/mc`).
 
 ## 2. Accessing the estimation results
 
