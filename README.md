@@ -347,6 +347,11 @@ p = Process(data=df, model=7, x="Effort", y="Success", w="Motivation", m=["Media
 p.summary()  # starts with: PROCESS version: 5.0. Bootstrap intervals: percentile. Moderators at the 16th, ...
 ````
 
+Versions `"3.0"` to `"3.5"` and `"4.0"` to `"4.3"` (and `"3"`, `"4"` for the last release of a major) are accepted
+too and share the conventions of 5.0: Hayes's release notes record no change to the interval type, the spotlight
+values or the probing threshold since 3.0 (December 2017), which is when they moved away from the 2.16 ones. Pass
+the release you used and the output names it; the numbers are checked against the PROCESS 5.0 output files.
+
 The 2.16 conventions stay the default throughout the 2.x releases; 3.0 will switch the default to `"5.0"`.
 
 ## 2. Accessing the estimation results

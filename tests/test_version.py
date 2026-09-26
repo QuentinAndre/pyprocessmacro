@@ -62,9 +62,27 @@ def test_version_5_intervals_are_percentile(fit):
     assert set(fit(4, **M4).tidy(component="indirect")["method"]) == {"bootstrap_bc"}
 
 
-@pytest.mark.parametrize("version", [5.0, "5", 5, 2.16, 2])
-def test_version_aliases(fit, version):
-    assert fit(1, version=version, **M1).version == ("5.0" if str(version).startswith("5") else "2.16")
+@pytest.mark.parametrize("version, resolved", [
+    (5.0, "5.0"), ("5", "5.0"), (5, "5.0"), (2.16, "2.16"), (2, "2.16"),
+    ("3", "3.5"), ("3.0", "3.0"), (3.2, "3.2"), (4, "4.3"), ("4.2", "4.2"),
+])
+def test_version_aliases(fit, version, resolved):
+    assert fit(1, version=version, **M1).version == resolved
+
+
+@pytest.mark.parametrize("version", ["3.0", "3.5", "4.0", "4.3"])
+def test_versions_3_and_4_share_the_conventions_of_5(fit, version):
+    """Hayes's release notes record no change to the estimation defaults since 3.0 (#90)."""
+    spec = dict(x="effort", w="motiv", m=["med1"], y="outcome")
+    p, five = fit(8, version=version, **spec), fit(8, version="5.0", **spec)
+    assert p.options["conventions"] == "3+"
+    for option in ("percent", "spotlight", "intprobe"):
+        assert p.options[option] == five.options[option]
+    pd.testing.assert_frame_equal(p.direct_model.coeff_summary(), five.direct_model.coeff_summary())
+    pd.testing.assert_frame_equal(p.indirect_model.coeff_summary(), five.indirect_model.coeff_summary())
+    assert p.summary().startswith(f"PROCESS version: {version} (same conventions as 5.0).")
+    one = fit(1, version=version, **M1_NULL)
+    assert one.options["intprobe"] == 0.10 and one.direct_model.probe_p == fit(1, version="5.0", **M1_NULL).direct_model.probe_p
 
 
 # --- explicit arguments win ---------------------------------------------------------------------------
@@ -85,7 +103,7 @@ def test_explicit_arguments_override_the_version(fit):
 
 # --- validation ---------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("version", ["3.0", "4.2", "five", None])
+@pytest.mark.parametrize("version", ["3.6", "4.4", "6.0", "five", None])
 def test_unknown_version_raises(fit, version):
     with pytest.raises(ValueError, match="'version'"):
         fit(1, version=version, **M1)
