@@ -9,7 +9,8 @@ import scipy.stats as stats
 from numpy import dot
 from numpy.linalg import inv, LinAlgError
 
-from .bootstrap import BootstrapSpec, bootstrap_parameters
+from . import negbin
+from .bootstrap import BootstrapSpec, bootstrap_parameters, family_of
 from .utils import (
     fast_OLS,
     fast_optimize,
@@ -276,7 +277,8 @@ class BaseOutcomeModel(object):
         Refit this outcome model with statsmodels and return the results object (#67).
 
         OLS models use statsmodels.OLS with the same covariance estimator (t-based inference, as here);
-        logistic models use statsmodels.Logit, whose default covariance is the inverse Hessian, as here.
+        logistic models use statsmodels.Logit and negative binomial models statsmodels.NegativeBinomial,
+        whose default covariance is the inverse Hessian, as here.
         statsmodels is an optional dependency: pip install pyprocessmacro[statsmodels].
         """
         try:
@@ -288,6 +290,8 @@ class BaseOutcomeModel(object):
         results = self.estimation_results
         exog = pd.DataFrame(self._exog, columns=results["names"])
         endog = pd.Series(self._endog, name=self._symb_to_var[self._endogvar])
+        if "alpha" in results:  # negative binomial (#25): statsmodels estimates alpha as its last parameter
+            return sm.NegativeBinomial(endog, exog).fit(disp=0, maxiter=500)
         if "z" in results:
             return sm.Logit(endog, exog).fit(disp=0)
         cov_type = results["cov_type"]
@@ -569,6 +573,90 @@ class LogitOutcomeModel(BaseOutcomeModel, BaseLogit):
         return self.summary()
 
 
+class NegBinOutcomeModel(BaseOutcomeModel):
+    """
+    Negative binomial regression (NB2, log link) for a count outcome Y (#25): a PyProcessMacro extension that
+    PROCESS does not offer. The coefficients are on the log-count scale with Wald z tests, and the dispersion
+    alpha (Var(Y) = mu + alpha mu^2) is estimated by maximum likelihood and reported in the model summary.
+    """
+
+    @staticmethod
+    def _cdf(linear):
+        """The mean function, exp. Named as the logistic model's so that augment() finds the fitted values."""
+        return np.exp(linear)
+
+    def _estimate(self):
+        max_iter, tolerance = self._options["iterate"], self._options["convergence"]
+        params = negbin.fit(self._endog, self._exog, max_iter, tolerance)
+        betas, log_alpha = params[:-1], params[-1]
+        try:
+            vcv_full = inv(-negbin.hessian(self._endog, self._exog, params))
+        except LinAlgError:
+            raise ConvergenceError("The Hessian of the negative binomial regression is singular.")
+        vcv = vcv_full[:-1, :-1]
+        se = np.sqrt(np.diagonal(vcv))
+        z = betas / se
+        p = stats.norm.sf(np.abs(z)) * 2
+        zscore = z_score(self._options["conf"])
+        llci = betas - se * zscore
+        ulci = betas + se * zscore
+        alpha = float(np.exp(log_alpha))
+        alpha_se = alpha * float(np.sqrt(max(vcv_full[-1, -1], 0.0)))  # delta method from log alpha
+        llmodel = negbin.loglike_sum(self._endog, self._exog, params)
+        constant = np.ones((self._n_obs, 1))
+        llnull = negbin.loglike_sum(self._endog, constant, negbin.fit(self._endog, constant, max_iter, tolerance))
+        d = 2 * (llmodel - llnull)
+        pvalue = stats.chi2.sf(d, self._n_vars - 1)
+        n_params = self._n_vars + 1  # alpha counts as a parameter
+        names = [self._symb_to_var.get(x, x) for x in self._exogvars]
+        return {
+            "betas": betas,
+            "se": se,
+            "vcv": vcv,
+            "z": z,
+            "p": p,
+            "llci": llci,
+            "ulci": ulci,
+            "alpha": alpha,
+            "alpha_se": alpha_se,
+            "d": d,
+            "minus2ll": -2 * llmodel,
+            "pvalue": pvalue,
+            "mcfadden": 1 - llmodel / llnull,
+            "n": int(self._n_obs),
+            "names": names,
+            "llf": llmodel,
+            "llnull": llnull,
+            "aic": 2 * n_params - 2 * llmodel,
+            "bic": n_params * np.log(self._n_obs) - 2 * llmodel,
+            "df_model": int(self._n_vars - 1),
+            "cov_type": "hessian",
+        }
+
+    def model_summary(self):
+        """The model statistics: -2LL, the likelihood-ratio test against the intercept-only model, alpha."""
+        results = self.estimation_results
+        row = [[results[i] for i in ["minus2ll", "d", "pvalue", "mcfadden", "alpha", "n"]]]
+        return pd.DataFrame(row, index=[""], columns=["-2LL", "Model LL", "p-value", "McFadden", "alpha", "n"])
+
+    def summary(self):
+        prec = self._options["precision"]
+        float_format = partial("{:.{prec}f}".format, prec=prec)
+        return (
+            "\n**************************************************************************\n"
+            "Outcome = {} \n"
+            "Negative Binomial Regression Summary\n\n{}\n\n"
+            "Coefficients\n\n{}".format(
+                self._symb_to_var[self._endogvar],
+                self.model_summary().to_string(float_format=float_format),
+                self.coeff_summary().to_string(float_format=float_format),
+            )
+        )
+
+    def __str__(self):
+        return self.summary()
+
+
 class ParallelMediationModel(object):
     """
     A class describing a parallel mediation model between an endogenous variable Y, one or several mediators M, and a
@@ -642,9 +730,10 @@ class ParallelMediationModel(object):
         self._exog_inds_m = [self._symb_to_ind[var] for var in self._exog_terms_m]
 
         self._compute_betas_m = fast_OLS
-        if self._options["logit"]:
-            max_iter = self._options["iterate"]
-            tolerance = self._options["convergence"]
+        family = family_of(self._options)
+        max_iter = self._options["iterate"]
+        tolerance = self._options["convergence"]
+        if family == "logit":
             self._compute_betas_y = partial(
                 fast_optimize,
                 n_obs=self._n_obs,
@@ -652,6 +741,8 @@ class ParallelMediationModel(object):
                 max_iter=max_iter,
                 tolerance=tolerance,
             )
+        elif family == "negbin":  # #25
+            self._compute_betas_y = partial(negbin.fit_betas, max_iter=max_iter, tolerance=tolerance)
         else:
             self._compute_betas_y = fast_OLS
 
@@ -709,7 +800,7 @@ class ParallelMediationModel(object):
         """
         spec = BootstrapSpec(
             self._ind_y, self._exog_inds_y, self._inds_m, self._exog_inds_m,
-            logit=self._options["logit"], max_iter=self._options["iterate"],
+            family=family_of(self._options), max_iter=self._options["iterate"],
             tolerance=self._options["convergence"],
         )
         # Batched estimation with the same draws as the sequential loop (#68).
@@ -1525,7 +1616,7 @@ class DirectEffectModel(object):
         always report their conditional direct effects.
         """
         self._model = model
-        self._is_logit = isinstance(model, LogitOutcomeModel)
+        self._is_logit = isinstance(model, (LogitOutcomeModel, NegBinOutcomeModel))  # z-based inference
         self._symb_to_var = symb_to_var
         self._derivative = self._model._derivative
         self._has_mediation = has_mediation
@@ -1548,8 +1639,8 @@ class DirectEffectModel(object):
         The p-value PROCESS 3 and later compare to intprobe before reporting the conditional effects of X (#87):
         the test of the highest-order product term(s) of X with its moderator(s), the smallest p-value when two
         additive moderators give two terms of that order. OLS: the coefficient's test, which is the F test of the
-        change in R-squared PROCESS prints for a single term under the same covariance estimator. Logit: the
-        likelihood-ratio test of the term, which PROCESS prints for a binary outcome.
+        change in R-squared PROCESS prints for a single term under the same covariance estimator. Logit and
+        negative binomial: the likelihood-ratio test of the term, which PROCESS prints for a binary outcome.
         :return: (p-value, the names of the terms tested)
         """
         model = self._model
@@ -1562,7 +1653,7 @@ class DirectEffectModel(object):
         pvalues = []
         for term in terms:
             if self._is_logit:
-                reduced = LogitOutcomeModel(
+                reduced = type(model)(
                     model._data, model._endogvar, [t for t in exog if t != term],
                     model._symb_to_ind, model._symb_to_var, model._options,
                 )

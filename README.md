@@ -55,6 +55,8 @@ The following changes and improvements have been made from the original Process 
   of bootstrap estimates, and dramatically speed up the estimation of complex models.
   * Transparent bootstrapping: PyProcessMacro explicitely reports the number of bootstrap samples that have been 
   discarded because of numerical instability.
+  * Count outcomes: with `family="negbin"`, the outcome Y is estimated by negative binomial regression (section
+  1.J). This is not a PROCESS feature.
 
 In the current version, the following features have not yet been ported to PyProcessMacro:
   * Support for categorical independent variables.
@@ -354,6 +356,31 @@ p.summary()  # starts with: Bootstrap intervals: percentile (PROCESS 3 and later
 
 The PROCESS 2 defaults stay through the 2.x releases; 3.0 will switch `percent` and `spotlight` to the PROCESS 3
 values.
+
+### J. Count outcomes: negative binomial regression (not a PROCESS feature)
+
+PROCESS estimates continuous outcomes by OLS and binary outcomes by logistic regression. PyProcessMacro adds a
+third estimator for the outcome Y, which PROCESS does not offer: with `family="negbin"`, Y is a count and its
+equation is a negative binomial regression (NB2, log link: the variance of Y is its mean plus `alpha` times the
+mean squared), estimated by maximum likelihood. The mediator equations stay OLS, as in PROCESS. `family="logit"`
+is the same as `logit=True`, and `family="ols"` is the default.
+
+````python
+p = Process(data=df, model=4, x="Effort", y="Complaints", m=["Frustration"], family="negbin")
+p.summary()
+````
+
+The coefficients of the Y equation are on the log-count scale, with Wald z tests, and the dispersion `alpha` is
+reported in the model summary (its standard error is in `estimation_results["alpha_se"]`). As with a logistic
+outcome, the direct effect is the coefficient of X in the Y equation and the indirect effect is the product of
+the OLS a path and the negative binomial b path, so it lives on the log-count scale of Y. Interpret it with the
+same care as PROCESS's logistic case: it multiplies a linear coefficient by one on a nonlinear scale, and a
+counterfactual definition of the effects is not implemented. `effsize` is not available, since the standardized
+effects assume a continuous outcome. The bootstrap refits the negative binomial on every resample; resamples on
+which it does not converge are discarded and counted, as for logistic outcomes. `glance()` reports `alpha` and
+the McFadden pseudo R-squared, `augment()` the predicted counts and response residuals, and `to_statsmodels()`
+the `statsmodels.NegativeBinomial` refit for diagnostics. The first line of `summary()` says that this estimator
+is an extension, so a saved output cannot be mistaken for PROCESS output.
 
 ## 2. Accessing the estimation results
 
