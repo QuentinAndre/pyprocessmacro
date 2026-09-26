@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -213,3 +215,38 @@ def get_model74_accuracy(logit):
 def test_model74_indirect_accuracy(logit):
     effects, boots = get_model74_accuracy(logit)
     assert (effects == 1) & (boots > 0.9)
+
+
+def get_model6_accuracy(logit):
+    """Model 6 (serial mediation) against the PROCESS 2.16 output, which labels the paths Ind1..Ind3 in the
+    same order as pyprocessmacro (by first mediator, then by length)."""
+    kind = "Logit" if logit else "OLS"
+    with open(os.path.join(TEST_DIR, "Results/Results_{}_Model6.txt".format(kind))) as f:
+        txt = f.read().split("******************** DIRECT AND INDIRECT EFFECTS *************************\n")[1]
+    data = pd.read_csv(os.path.join(TEST_DIR, "Data/Data_Model6.csv"))
+    process = Process(data, 6, precision=4, conf=95, modval={}, quantile=False, logit=logit,
+                      seed=123456, suppr_init=True, total=True, hc3=True,
+                      x="x", m=["m1", "m2"], y="y2" if logit else "y")
+    truedir = get_direct_effect(txt)
+    estdir = process.direct_model.coeff_summary()
+    coldir = ["Effect", "SE", "Z" if logit else "t", "p", "LLCI", "ULCI"]
+    direffects = np.isclose(truedir[coldir].values, estdir[coldir].values, rtol=1e-3, atol=1e-3).mean()
+
+    block = txt.split("Indirect effect(s) of X on Y")[1].split("Indirect effect key")[0]
+    rows = []
+    for line in block.splitlines():
+        match = re.match(r"^\s*(Total|Ind\d+)\s*:\s+(.*)$", line)
+        if match:
+            rows.append([float(v) for v in match.group(2).split()])
+    truth = np.array(rows)  # Total, Ind1, Ind2, Ind3: Effect, Boot SE, BootLLCI, BootULCI
+    est = process.indirect_model.coeff_summary()[["Effect", "Boot SE", "BootLLCI", "BootULCI"]].values
+    tol = 5e-2 if logit else 1e-2
+    indireffects = np.isclose(truth[:, 0], est[:, 0], rtol=1e-3, atol=1e-3).mean()
+    indirboots = np.isclose(truth, est, rtol=tol, atol=tol).mean()
+    return direffects, indireffects, indirboots
+
+
+@pytest.mark.parametrize("logit", [False, True], ids=["ols", "logit"])
+def test_model6_accuracy(logit):
+    d, i, b = get_model6_accuracy(logit)
+    assert (d == 1) & (i == 1) & (b > 0.9)

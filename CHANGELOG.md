@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Comparison files produced with PROCESS for R version 5.0 for every model PROCESS 5 defines (`tests/Results/v5`), the generator that makes them from Hayes's `process.R` (`tests/fixtures/regenerate.py`), and a `v5`-marked test that checks what 2.x already claims to reproduce against them and lists the deliberate differences for 3.0. The 2.16 files remain the accuracy reference for 2.x (#82).
+- Model 6 is compared to the PROCESS 2.16 output file that was already in the repository (#69).
+
 ## [2.1.0] - 2026-09-25
 
 Additive release, tracked in the
