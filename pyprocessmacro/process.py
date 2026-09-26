@@ -51,13 +51,22 @@ class Process(object):
         "moments",
     }
 
-    # The conventions of the PROCESS releases whose output the test suite holds (#87): the value an argument
-    # left at None takes, the spotlight rule for continuous moderators and the probing threshold of models 1 to 3.
-    VERSIONS = {
-        "2.16": {"percent": False, "spotlight": "moments", "intprobe": 1.0},
-        "5.0": {"percent": True, "spotlight": "percentiles", "intprobe": 0.10},
+    # The conventions of the PROCESS releases (#87, #90): the value an argument left at None takes, the spotlight
+    # rule for continuous moderators and the probing threshold of models 1 to 3. Hayes's release notes record one
+    # change to these since 2.16: PROCESS 3.0 (December 2017) moved from bias-corrected to percentile intervals
+    # and from the mean and SD to the 16th, 50th and 84th percentiles, and introduced intprobe. Every 3.x, 4.x
+    # and 5.0 release shares those defaults. The test suite holds output of 2.16 and 5.0; the other releases are
+    # checked against the 5.0 files.
+    CONVENTIONS = {
+        "2": {"percent": False, "spotlight": "moments", "intprobe": 1.0},
+        "3+": {"percent": True, "spotlight": "percentiles", "intprobe": 0.10},
     }
-    VERSION_ALIASES = {"2": "2.16", "5": "5.0"}
+    VERSIONS = {
+        "2.16": "2",
+        **{v: "3+" for v in ("3.0", "3.1", "3.2", "3.3", "3.4", "3.5", "4.0", "4.1", "4.2", "4.3", "5.0")},
+    }
+    VERSION_ALIASES = {"2": "2.16", "3": "3.5", "4": "4.3", "5": "5.0"}  # a major means its last release
+    TESTED_VERSIONS = ("2.16", "5.0")
 
     # Models that a later PROCESS release retired. They are estimated under every version, as PROCESS 2.16
     # defined them, with a note (#91): PROCESS 3.0 dropped the third and fourth moderators (models 23 to 27 and
@@ -679,9 +688,12 @@ class Process(object):
             Newton-Raphson algorithm of the logistic regression.
         :param precision:
             The number of decimal places to display in the summary of the model results.
-        :param version: "2.16" or "5.0"
-            The PROCESS release whose conventions to reproduce (#87): the type of bootstrap interval, the
-            spotlight values of continuous moderators and the probing threshold of models 1 to 3. An argument
+        :param version: str
+            The PROCESS release whose conventions to reproduce (#87, #90): the type of bootstrap interval, the
+            spotlight values of continuous moderators and the probing threshold of models 1 to 3. Accepted:
+            "2.16", "3.0" to "3.5", "4.0" to "4.3", "5.0", and "2", "3", "4", "5" for the last release of a
+            major. Hayes's release notes record one change to these conventions since 2.16, in 3.0, so every 3.x
+            and 4.x string behaves as "5.0" and is checked against the PROCESS 5.0 output files. An argument
             passed explicitly always wins over the version's default. "2.16", the default, is what PyProcessMacro
             has always produced; "5.0" reproduces PROCESS for R 5.0. Every model is estimated under every
             version; a note (also a UserWarning) names the release that retired models 23 to 27 and 30 to 57
@@ -956,7 +968,8 @@ class Process(object):
         Check the model number against the PROCESS version emulated, and fill in the arguments left at None
         with that version's defaults (#87). The rule for the spotlight values is stored under "spotlight".
         """
-        conventions = self.VERSIONS[options["version"]]
+        options["conventions"] = self.VERSIONS[options["version"]]
+        conventions = self.CONVENTIONS[options["conventions"]]
         if self.model_num not in self.__models_vars__:
             raise ValueError(
                 f"Model {self.model_num} is not a PROCESS model number: PyProcessMacro implements models 1 to 76."
@@ -1263,7 +1276,7 @@ class Process(object):
             uniques = np.unique(val)
             if spotvals:
                 spot_values[mod] = spotvals
-            elif len(uniques) <= 5 and self.options["version"] == "2.16":
+            elif len(uniques) <= 5 and self.options["conventions"] == "2":
                 spot_values[mod] = uniques
             elif len(uniques) == 2:
                 spot_values[mod] = uniques
@@ -1526,7 +1539,8 @@ class Process(object):
     def _conventions_text(self):
         """One line naming the PROCESS version emulated and the conventions in force after any override (#87)."""
         o = self.options
-        parts = [f"PROCESS version: {o['version']}."]
+        label = o["version"] if o["version"] in self.TESTED_VERSIONS else f"{o['version']} (same conventions as 5.0)"
+        parts = [f"PROCESS version: {label}."]
         if self.has_mediation:
             parts.append(f"Bootstrap intervals: {'percentile' if o['percent'] else 'bias-corrected'}.")
         if self._moderators["all"]:
