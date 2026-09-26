@@ -8,17 +8,17 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- `version` argument: `"2.16"` (the default, what PyProcessMacro has always produced) or `"5.0"`, the conventions of PROCESS for R 5.0: percentile bootstrap intervals, spotlight values at the 16th, 50th and 84th percentiles computed as PROCESS does, conditional effects of models 1 to 3 reported only when the highest-order interaction has p at most `intprobe=0.10`. Models 23 to 27 and 30 to 57 (retired in PROCESS 3.0) and 74 (retired in 4.0) are estimated under every version as PROCESS 2.16 defined them, with a note, also raised as a `UserWarning`, naming the release that retired them (#91). An argument passed explicitly wins over the version's default. The 2.16 conventions stay the default throughout 2.x; 3.0 switches to 5.0 (#87, #74).
-- `version` also accepts `"3.0"` to `"3.5"` and `"4.0"` to `"4.3"` (and `"3"`, `"4"`), which share the conventions of 5.0: Hayes's release notes record no change to the bootstrap interval type, the spotlight values or the probing threshold since 3.0. The output names the release given, and the numbers are checked against the PROCESS 5.0 output files (#90).
-- `intprobe` and `moments` options, PROCESS's own names for the probing threshold of models 1 to 3 and for spotlight values at the mean and one SD either side. `direct_model.probe_p` and `direct_model.probed` expose the test PROCESS compares to `intprobe`: the coefficient's test for OLS, a likelihood-ratio test for a binary outcome (#87).
-- The initialization banner, `summary()` and the notebook display start with the PROCESS version emulated and the conventions in force (#87).
-- The PROCESS 5 comparison test fits with `version="5.0"` and lets PyProcessMacro compute the spotlight values, which checks its percentile rule against PROCESS's (#87).
+- `spotlight` option for the values at which continuous moderators are probed: `"moments"` (the default, and the PROCESS 2 rule), `"percentiles"` (the 16th, 50th and 84th percentiles computed as PROCESS 3 and later do) or `"quantiles"` (the `quantile=True` rule). Under `"percentiles"` a moderator is probed at its two values only when dichotomous, as PROCESS does (#87, #90).
+- `intprobe` option: models 1 to 3 report their conditional effects only when the highest-order interaction of X has p at most `intprobe` (default 1, always, as PROCESS 2; PROCESS 3 and later use 0.10). `direct_model.probe_p` and `direct_model.probed` expose the test PROCESS compares to it: the coefficient's test for OLS, a likelihood-ratio test for a binary outcome (#87).
+- The initialization banner, `summary()` and the notebook display start with the conventions in force (interval type, spotlight rule, probing threshold) and the PROCESS release each is the default of, so a saved output says how its numbers were produced (#87).
+- Models 23 to 27 and 30 to 57 (retired in PROCESS 3.0) and 74 (retired in 4.0), none of which exists in PROCESS 5, are estimated as PROCESS 2.16 defined them with a note, also raised as a `UserWarning`, naming the release that retired them (#91).
+- README section on the three defaults PROCESS 3.0 changed (bootstrap interval type, spotlight values, probing threshold) and the two options that reproduce PROCESS 3, 4 or 5: `percent=True, spotlight="percentiles"` (#90).
+- The PROCESS 5 comparison test fits with those two options and lets PyProcessMacro compute the spotlight values, which checks its percentile rule against PROCESS's (#87).
 - Comparison files produced with PROCESS for R version 5.0 for every model PROCESS 5 defines (`tests/Results/v5`), the generator that makes them from Hayes's `process.R` (`tests/fixtures/regenerate.py`), and a `v5`-marked test that checks what 2.x already claims to reproduce against them and lists the deliberate differences for 3.0. The 2.16 files remain the accuracy reference for 2.x (#82).
 - Model 6 is compared to the PROCESS 2.16 output file that was already in the repository (#69).
 
 ### Changed
 
-- `percent` defaults to None and takes the version's value: bias-corrected intervals under `"2.16"`, as before (#87).
 - The error for an invalid `quantile` value named the wrong option.
 
 ### Fixed
