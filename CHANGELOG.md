@@ -4,7 +4,11 @@ All notable changes to PyProcessMacro are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.2.0] - 2026-09-29
+
+Additive release, tracked in the
+[2.2.0 milestone](https://github.com/QuentinAndre/pyprocessmacro/milestone/5).
+Nothing written against 2.1 stops working; the defaults are unchanged.
 
 ### Added
 
